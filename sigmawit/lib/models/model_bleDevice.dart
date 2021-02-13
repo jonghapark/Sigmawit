@@ -10,8 +10,9 @@ class BleDeviceItem {
   Peripheral peripheral;
   int rssi;
   AdvertisementData advertisementData;
-  BleDeviceItem(
-      this.deviceName, this.rssi, this.peripheral, this.advertisementData);
+  String connectionState;
+  BleDeviceItem(this.deviceName, this.rssi, this.peripheral,
+      this.advertisementData, this.connectionState);
 
   getTemperature() {
     int tmp = ByteData.sublistView(
@@ -55,6 +56,13 @@ class BleDeviceItem {
       result += tmps2.toRadixString(16);
     }
     return 'Sensor_' + result;
+  }
+
+  getMacAddress() {
+    print('3' + this.advertisementData.manufacturerData.toString());
+    Uint8List macAddress =
+        this.advertisementData.manufacturerData.sublist(4, 10);
+    return macAddress;
   }
 }
 

@@ -13,9 +13,6 @@ import 'package:geocoder/geocoder.dart';
 import 'package:intl/intl.dart';
 import 'package:toggle_switch/toggle_switch.dart';
 
-// URL
-// 10.3.141.1:4000
-
 class Scanscreen extends StatefulWidget {
   @override
   ScanscreenState createState() => ScanscreenState();
@@ -39,6 +36,9 @@ class ScanscreenState extends State<Scanscreen> {
   String _error;
   String geolocation;
   String currentDeviceName = '';
+  Timer _timer;
+  int _start = 0;
+  bool isStart = false;
   // double width;
 
   String currentTemp;
@@ -51,14 +51,93 @@ class ScanscreenState extends State<Scanscreen> {
     currentDeviceName = '';
     currentTemp = '-';
     currentHumi = '-';
-    _listenLocation();
+
     // getCurrentLocation();
     init();
+    // startTimer();
     // location.onLocationChanged.listen((loc.LocationData currentLocation) {
     //   this.currentLocation = currentLocation;
     //   print('여긴오냐 ->' + currentLocation.latitude.toString());
     //   // Use current location
     // });
+  }
+
+  @override
+  void dispose() {
+    // ->> 사라진 위젯에서 cancel하려고 해서 에러 발생
+    super.dispose();
+  }
+
+  void startRoutine(int index) async {
+    String unixTimestamp =
+        (DateTime.now().toUtc().millisecondsSinceEpoch / 1000)
+            .toInt()
+            .toRadixString(16);
+    print('2' + deviceList[index].getMacAddress().toString());
+
+    Uint8List timestamp = Uint8List.fromList([
+      int.parse(unixTimestamp.substring(0, 2), radix: 16),
+      int.parse(unixTimestamp.substring(2, 4), radix: 16),
+      int.parse(unixTimestamp.substring(4, 6), radix: 16),
+      int.parse(unixTimestamp.substring(6, 8), radix: 16),
+    ]);
+    print('4' +
+        Uint8List.fromList([
+                  0x55,
+                  0xaa,
+                  0x01,
+                  0x05,
+                ] +
+                deviceList[index].getMacAddress() +
+                [0x02, 0x04] +
+                timestamp)
+            .toString());
+
+    var writeChararcteristics =
+        await deviceList[index].peripheral.writeCharacteristic(
+            '00001000-0000-1000-8000-00805f9b34fb',
+            '00001001-0000-1000-8000-00805f9b34fb',
+            Uint8List.fromList([
+                  0x55,
+                  0xaa,
+                  0x01,
+                  0x05,
+                ] +
+                deviceList[index].getMacAddress() +
+                [0x04, 0x04] +
+                timestamp),
+            true);
+    sleep(Duration(seconds: 2));
+    var readCharacteristics = await deviceList[index]
+        .peripheral
+        .readCharacteristic('00001000-0000-1000-8000-00805f9b34fb',
+            '00001002-0000-1000-8000-00805f9b34fb');
+    print('result: ' + readCharacteristics.value.toString());
+  }
+
+  // 타이머 시작
+  // 00:00:00
+  void startTimer() {
+    if (isStart == true) return;
+    const oneSec = const Duration(seconds: 15);
+    _timer = new Timer.periodic(
+      oneSec,
+      (Timer timer) => setState(
+        () {
+          if (isStart == false) isStart = true;
+          _start = _start + 1;
+          // if (_start % 5 == 0) {
+          print(_start);
+          _checkPermissions();
+          _listenLocation();
+          // }
+          // date = (new DateTime(1996,5,23, _start~/3600 ,
+          //  (_start-(_start~/3600)*3600) ~/ 60 ,
+          //  ((_start-(_start~/3600)*3600) ~/ 60 ) * 60
+          //  );
+        },
+      ),
+    );
   }
 
   Future<void> _listenLocation() async {
@@ -74,9 +153,9 @@ class ScanscreenState extends State<Scanscreen> {
       var addresses =
           await Geocoder.local.findAddressesFromCoordinates(coordinates);
       var first = addresses.first;
-      if (!_isScanning) {
-        scan();
-      }
+      // if (!_isScanning) {
+      //   scan();
+      // }
       if (this.geolocation != first.addressLine) {
         setState(() {
           _error = null;
@@ -128,7 +207,7 @@ class ScanscreenState extends State<Scanscreen> {
   // 권한 확인 함수 권한 없으면 권한 요청 화면 표시, 안드로이드만 상관 있음
   _checkPermissions() async {
     if (Platform.isAndroid) {
-      if (await Permission.contacts.request().isGranted) {
+      if (await Permission.location.request().isGranted) {
         print('입장하냐?');
         scan();
         return;
@@ -150,128 +229,239 @@ class ScanscreenState extends State<Scanscreen> {
       padding: const EdgeInsets.all(8),
       itemCount: deviceList.length,
       itemBuilder: (BuildContext context, int index) {
-        return Container(
-          decoration: BoxDecoration(
-              color: Colors.white,
-              //boxShadow: [customeBoxShadow()],
-              borderRadius: BorderRadius.all(Radius.circular(5))),
-          height: MediaQuery.of(context).size.height * 0.3,
-          width: MediaQuery.of(context).size.width * 0.98,
-          child: Column(children: [
-            Expanded(
-              flex: 3,
-              child: Container(
-                  width: MediaQuery.of(context).size.width * 0.98,
-                  decoration: BoxDecoration(
-                      color: Color.fromRGBO(71, 71, 71, 1),
-                      //boxShadow: [customeBoxShadow()],
-                      borderRadius: BorderRadius.all(Radius.circular(5))),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        deviceList[index].getDeviceId(),
-                        style: whiteTextStyle,
-                      ),
-                      Text(
-                        deviceList[index].getBattery().toString(),
-                        style: whiteTextStyle,
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          ToggleSwitch(
-                            // initialLabelIndex:
-                            //     deviceList[index].sendState == true ||
-                            //             deviceList[index].sendState == null
-                            //         ? 0
-                            //         : 1,
-                            minWidth: 100.0,
-                            cornerRadius: 20.0,
-                            activeBgColor: Colors.cyan,
-                            activeFgColor: Colors.white,
-                            inactiveBgColor: Colors.grey,
-                            inactiveFgColor: Colors.white,
-                            labels: ['ON', 'OFF'],
-                            icons: [Icons.check, Icons.highlight_off],
-                            onToggle: (index) async {
-                              if (index == 0) {
-                                deviceList[index].sendState = true;
-                                setState(() {});
-                              } else {
-                                deviceList[index].sendState = false;
-                                setState(() {});
-                              }
-                            },
-                          ),
-                        ],
-                      )
-                    ],
-                  )),
-            ),
-            Expanded(
-                flex: 3,
-                child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        return InkWell(
+            onTap: () => connect(index),
+            child: Container(
+              decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [customeBoxShadow()],
+                  borderRadius: BorderRadius.all(Radius.circular(5))),
+              height: MediaQuery.of(context).size.height * 0.3,
+              width: MediaQuery.of(context).size.width * 0.99,
+              child: Column(children: [
+                Expanded(
+                  flex: 3,
+                  child: Container(
+                      padding: EdgeInsets.only(top: 5, left: 2),
+                      width: MediaQuery.of(context).size.width * 0.98,
+                      decoration: BoxDecoration(
+                          color: Color.fromRGBO(71, 71, 71, 1),
+                          //boxShadow: [customeBoxShadow()],
+                          borderRadius: BorderRadius.all(Radius.circular(5))),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Row(
                             children: [
+                              Text(' '),
                               Image(
-                                image: AssetImage('images/ic_thermometer.png'),
-                                fit: BoxFit.cover,
+                                image: AssetImage('images/T301.png'),
+                                fit: BoxFit.contain,
                                 width: MediaQuery.of(context).size.width * 0.10,
                                 height:
                                     MediaQuery.of(context).size.width * 0.10,
                               ),
+                              Text(' '),
                               Text(
-                                  deviceList[index]
-                                          .getTemperature()
-                                          .toString() +
-                                      '°C',
-                                  style: bigTextStyle),
+                                deviceList[index].getDeviceId(),
+                                style: whiteTextStyle,
+                              ),
+                            ],
+                          ),
+                          deviceList[index].connectionState == 'connect'
+                              ? Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Container(
+                                        width:
+                                            MediaQuery.of(context).size.width *
+                                                0.3,
+                                        height:
+                                            MediaQuery.of(context).size.width *
+                                                0.10,
+                                        decoration: BoxDecoration(
+                                          border: Border(),
+                                        ),
+                                        child: RaisedButton(
+                                          //padding: EdgeInsets.all(1),
+                                          onPressed: () {
+                                            startRoutine(index);
+                                          },
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.all(
+                                                  Radius.circular(0))),
+                                          color: Color.fromRGBO(22, 33, 55, 1),
+                                          child: Container(
+                                            child: Text('측정 시작',
+                                                style: this.btnTextStyle),
+                                          ),
+                                        )),
+                                    Container(
+                                        width:
+                                            MediaQuery.of(context).size.width *
+                                                0.3,
+                                        height:
+                                            MediaQuery.of(context).size.width *
+                                                0.10,
+                                        decoration: BoxDecoration(
+                                          border: Border(),
+                                        ),
+                                        child: RaisedButton(
+                                          //padding: EdgeInsets.all(1),
+                                          onPressed: () async {},
+                                          shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.all(
+                                                  Radius.circular(0))),
+                                          color: Color.fromRGBO(22, 33, 55, 1),
+                                          child: Container(
+                                            child: Text('측정 종료',
+                                                style: this.btnTextStyle),
+                                          ),
+                                        ))
+                                  ],
+                                )
+                              : SizedBox()
+                          // Row(
+                          //   mainAxisAlignment: MainAxisAlignment.center,
+                          //   children: [
+                          //     ToggleSwitch(
+                          //       // initialLabelIndex:
+                          //       //     deviceList[index].sendState == true ||
+                          //       //             deviceList[index].sendState == null
+                          //       //         ? 0
+                          //       //         : 1,
+                          //       minWidth: 100.0,
+                          //       cornerRadius: 20.0,
+                          //       activeBgColor: Colors.cyan,
+                          //       activeFgColor: Colors.white,
+                          //       inactiveBgColor: Colors.grey,
+                          //       inactiveFgColor: Colors.white,
+                          //       labels: ['ON', 'OFF'],
+                          //       icons: [Icons.check, Icons.highlight_off],
+                          //       onToggle: (index) async {
+                          //         if (index == 0) {
+                          //           deviceList[index].sendState = true;
+                          //           setState(() {});
+                          //         } else {
+                          //           deviceList[index].sendState = false;
+                          //           setState(() {});
+                          //         }
+                          //       },
+                          //     ),
+                          //   ],
+                          // )
+                          ,
+                          Icon(
+                            Icons.image,
+                            size: MediaQuery.of(context).size.width * 0.15,
+                          )
+                        ],
+                      )),
+                ),
+                Expanded(
+                    flex: 3,
+                    child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              SizedBox(),
+                            ],
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              Row(
+                                children: [
+                                  Image(
+                                    image:
+                                        AssetImage('images/ic_thermometer.png'),
+                                    fit: BoxFit.cover,
+                                    width: MediaQuery.of(context).size.width *
+                                        0.10,
+                                    height: MediaQuery.of(context).size.width *
+                                        0.10,
+                                  ),
+                                  Text(
+                                      deviceList[index]
+                                              .getTemperature()
+                                              .toString() +
+                                          '°C',
+                                      style: bigTextStyle),
+                                ],
+                              ),
+                              Row(
+                                children: [
+                                  Image(
+                                    image: AssetImage('images/ic_humidity.png'),
+                                    fit: BoxFit.cover,
+                                    width: MediaQuery.of(context).size.width *
+                                        0.09,
+                                    height: MediaQuery.of(context).size.width *
+                                        0.09,
+                                  ),
+                                  Text(
+                                    deviceList[index].getHumidity().toString() +
+                                        '%',
+                                    style: bigTextStyle,
+                                  )
+                                ],
+                              ),
                             ],
                           ),
                           Row(
                             children: [
-                              Image(
-                                image: AssetImage('images/ic_humidity.png'),
-                                fit: BoxFit.cover,
-                                width: MediaQuery.of(context).size.width * 0.09,
-                                height:
-                                    MediaQuery.of(context).size.width * 0.09,
-                              ),
-                              Text(
-                                deviceList[index].getHumidity().toString() +
-                                    '%',
-                                style: bigTextStyle,
-                              )
-                            ],
-                          ),
-                        ],
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Text('Last updated  '),
-                          deviceList[index].lastUpdateTime != null
-                              ? Text(
-                                  DateFormat('yyyy-MM-dd - HH:mm')
-                                      .format(deviceList[index].lastUpdateTime),
-                                  style: updateTextStyle,
-                                )
-                              : Text(
-                                  '-',
-                                  style: updateTextStyle,
+                              Expanded(
+                                flex: 3,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        getbatteryImage(
+                                            deviceList[index].getBattery()),
+                                        Text(
+                                          '  ' +
+                                              deviceList[index]
+                                                  .getBattery()
+                                                  .toString() +
+                                              '%',
+                                          style: lastUpdateTextStyle,
+                                        ),
+                                      ],
+                                    )
+                                  ],
                                 ),
-                        ],
-                      )
-                    ]))
-          ]),
-        );
+                              ),
+                              Expanded(
+                                flex: 8,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    Text('Last updated  ',
+                                        style: lastUpdateTextStyle),
+                                    deviceList[index].lastUpdateTime != null
+                                        ? Text(
+                                            DateFormat('yyyy-MM-dd - HH:mm')
+                                                .format(deviceList[index]
+                                                    .lastUpdateTime),
+                                            style: updateTextStyle,
+                                          )
+                                        : Text(
+                                            '-',
+                                            style: updateTextStyle,
+                                          ),
+                                    Text('  ')
+                                  ],
+                                ),
+                              ),
+                            ],
+                          )
+                        ]))
+              ]),
+            ));
       },
       //12,13 온도
       separatorBuilder: (BuildContext context, int index) {
@@ -302,6 +492,7 @@ class ScanscreenState extends State<Scanscreen> {
     if (!_isScanning) {
       deviceList.clear(); //기존 장치 리스트 초기화
       //SCAN 시작
+      print('listen!');
       _bleManager.startPeripheralScan().listen((scanResult) {
         //listen 이벤트 형식으로 장치가 발견되면 해당 루틴을 계속 탐.
         //periphernal.name이 없으면 advertisementData.localName확인 이것도 없다면 unknown으로 표시
@@ -322,12 +513,13 @@ class ScanscreenState extends State<Scanscreen> {
         });
         // 새로 발견된 장치면 추가
         if (!findDevice) {
+          // print(name);
           if (name != "Unknown") {
+            // print(name);
             // if (name.substring(0, 3) == 'IOT') {
-
             if (name.substring(0, 4) == 'T301')
               deviceList.add(BleDeviceItem(name, scanResult.rssi,
-                  scanResult.peripheral, scanResult.advertisementData));
+                  scanResult.peripheral, scanResult.advertisementData, 'scan'));
             // print(scanResult.peripheral.name +
             //     "의 advertiseData  \n" +
             // }
@@ -344,12 +536,12 @@ class ScanscreenState extends State<Scanscreen> {
     } else {
       //스캔중이었으면 스캔 중지
       // TODO: 일단 주석!
-      // _bleManager.stopPeripheralScan();
-      // setState(() {
-      //   //BLE 상태가 변경되면 페이지도 갱신
-      //   _isScanning = false;
-      //   setBLEState('Stop Scan');
-      // });
+      _bleManager.stopPeripheralScan();
+      setState(() {
+        //BLE 상태가 변경되면 페이지도 갱신
+        _isScanning = false;
+        setBLEState('Stop Scan');
+      });
     }
   }
 
@@ -395,6 +587,7 @@ class ScanscreenState extends State<Scanscreen> {
             _curPeripheral = peripheral;
             getCurrentLocation();
             //peripheral.
+            deviceList[index].connectionState = 'connect';
             setBLEState('연결 완료');
             setState(() {
               processState = 3;
@@ -424,6 +617,7 @@ class ScanscreenState extends State<Scanscreen> {
           break;
         case PeripheralConnectionState.connecting:
           {
+            deviceList[index].connectionState = 'connecting';
             print('연결중입니당!');
             setBLEState('<연결 중>');
           } //연결중
@@ -433,6 +627,7 @@ class ScanscreenState extends State<Scanscreen> {
             //해제됨
             _connected = false;
             print("${peripheral.name} has DISCONNECTED");
+            deviceList[index].connectionState = 'scan';
             setBLEState('<연결 종료>');
             if (processState == 2) {
               setState(() {
@@ -495,6 +690,11 @@ class ScanscreenState extends State<Scanscreen> {
     });
   }
 
+  TextStyle lastUpdateTextStyle = TextStyle(
+    fontSize: 15,
+    color: Color.fromRGBO(5, 5, 5, 1),
+    fontWeight: FontWeight.w300,
+  );
   TextStyle updateTextStyle = TextStyle(
     fontSize: 15,
     color: Color.fromRGBO(0xe8, 0x52, 0x55, 1),
@@ -507,9 +707,9 @@ class ScanscreenState extends State<Scanscreen> {
   );
 
   TextStyle bigTextStyle = TextStyle(
-    fontSize: 35,
-    color: Color.fromRGBO(150, 150, 150, 1),
-    fontWeight: FontWeight.w400,
+    fontSize: 33,
+    color: Color.fromRGBO(50, 50, 50, 1),
+    fontWeight: FontWeight.w200,
   );
 
   TextStyle thinTextStyle = TextStyle(
@@ -523,7 +723,7 @@ class ScanscreenState extends State<Scanscreen> {
         title: 'Sigmawit',
         theme: ThemeData(
           // primarySwatch: Colors.grey,
-          primaryColor: Color.fromRGBO(22, 33, 55, 1),
+          primaryColor: Color.fromRGBO(0x61, 0xB2, 0xD0, 1),
           //canvasColor: Colors.transparent,
         ),
         home: Scaffold(
@@ -536,6 +736,7 @@ class ScanscreenState extends State<Scanscreen> {
               Text(
                 'Orior',
                 textAlign: TextAlign.center,
+                style: TextStyle(fontWeight: FontWeight.w300),
               ),
             ],
           )),
@@ -543,7 +744,7 @@ class ScanscreenState extends State<Scanscreen> {
             width: MediaQuery.of(context).size.width,
             decoration: BoxDecoration(
               color: Color.fromRGBO(240, 240, 240, 1),
-              //boxShadow: [customeBoxShadow()],
+              boxShadow: [customeBoxShadow()],
               //color: Color.fromRGBO(81, 97, 130, 1),
             ),
             child: Column(
@@ -551,9 +752,9 @@ class ScanscreenState extends State<Scanscreen> {
                 Expanded(
                     flex: 6,
                     child: Container(
-                      margin: EdgeInsets.all(
-                          MediaQuery.of(context).size.width * 0.035),
-                      width: MediaQuery.of(context).size.width * 0.915,
+                      margin: EdgeInsets.only(
+                          top: MediaQuery.of(context).size.width * 0.035),
+                      width: MediaQuery.of(context).size.width * 0.97,
                       // height:
                       //     MediaQuery.of(context).size.width * 0.45,
 
@@ -568,15 +769,46 @@ class ScanscreenState extends State<Scanscreen> {
 
   BoxShadow customeBoxShadow() {
     return BoxShadow(
-        color: Colors.black.withOpacity(0.5),
-        offset: Offset(0, 5),
+        color: Colors.black.withOpacity(0.2),
+        offset: Offset(0, 1),
         blurRadius: 6);
+  }
+
+  Widget getbatteryImage(int battery) {
+    if (battery >= 75) {
+      return Image(
+        image: AssetImage('images/battery_100.png'),
+        fit: BoxFit.contain,
+        width: MediaQuery.of(context).size.width * 0.1,
+        height: MediaQuery.of(context).size.width * 0.1,
+      );
+    } else if (battery >= 50) {
+      return Image(
+        image: AssetImage('images/battery_75.png'),
+        fit: BoxFit.contain,
+        width: MediaQuery.of(context).size.width * 0.1,
+        height: MediaQuery.of(context).size.width * 0.1,
+      );
+    } else if (battery >= 35) {
+      return Image(
+        image: AssetImage('images/battery_50.png'),
+        fit: BoxFit.contain,
+        width: MediaQuery.of(context).size.width * 0.05,
+        height: MediaQuery.of(context).size.width * 0.05,
+      );
+    } else if (battery >= 15)
+      return Image(
+        image: AssetImage('images/battery_25.png'),
+        fit: BoxFit.contain,
+        width: MediaQuery.of(context).size.width * 0.1,
+        height: MediaQuery.of(context).size.width * 0.1,
+      );
   }
 
   TextStyle whiteTextStyle = TextStyle(
     fontSize: 18,
     color: Color.fromRGBO(255, 255, 255, 1),
-    fontWeight: FontWeight.w300,
+    fontWeight: FontWeight.w200,
   );
   TextStyle btnTextStyle = TextStyle(
     fontSize: 20,
@@ -622,9 +854,9 @@ class ScanscreenState extends State<Scanscreen> {
 
   _checkPermissionCamera() async {
     if (Platform.isAndroid) {
-      if (await Permission.contacts.request().isGranted) {
+      if (await Permission.camera.request().isGranted) {
         print('입장하냐?');
-        //scan();
+        scan();
         return '';
       }
       Map<Permission, PermissionStatus> statuses =
