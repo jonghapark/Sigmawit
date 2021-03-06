@@ -35,6 +35,10 @@ dependencies:
   geocoder: ^0.2.1
   intl: ^0.15.7
   toggle_switch: ^0.1.8
+  camera: ^0.5.8+17
+  path_provider: ^1.6.27
+  path: ^1.7.0
+  
 
 dev_dependencies:
   flutter_test:

@@ -11,7 +11,8 @@ import 'dart:async';
 import 'package:location/location.dart' as loc;
 import 'package:geocoder/geocoder.dart';
 import 'package:intl/intl.dart';
-import 'package:toggle_switch/toggle_switch.dart';
+import '../component/screen_camera.dart';
+import 'package:camera/camera.dart';
 
 class Scanscreen extends StatefulWidget {
   @override
@@ -41,31 +42,102 @@ class ScanscreenState extends State<Scanscreen> {
   bool isStart = false;
   // double width;
 
+  String firstImagePath = '';
+  String secondImagePath = '';
+
   String currentTemp;
   String currentHumi;
 
   @override
   void initState() {
     super.initState();
-    //width = MediaQuery.of(context).size.width;
+    getCurrentLocation();
     currentDeviceName = '';
     currentTemp = '-';
     currentHumi = '-';
 
-    // getCurrentLocation();
     init();
-    // startTimer();
-    // location.onLocationChanged.listen((loc.LocationData currentLocation) {
-    //   this.currentLocation = currentLocation;
-    //   print('여긴오냐 ->' + currentLocation.latitude.toString());
-    //   // Use current location
-    // });
   }
 
   @override
   void dispose() {
     // ->> 사라진 위젯에서 cancel하려고 해서 에러 발생
     super.dispose();
+  }
+
+  Future<Post> sendtoServer(Data data) async {
+    var client = http.Client();
+    try {
+      var uriResponse =
+          await client.post('http://175.126.232.236/_API/saveData.php', body: {
+        "isRegularData": "true",
+        "tra_datetime": data.time,
+        "tra_temp": data.temper,
+        "tra_humidity": data.humi,
+        "tra_lat": data.lat,
+        "tra_lon": data.lng,
+        "de_number": data.deviceName,
+        "tra_battery": data.battery,
+        "tra_impact": data.lex
+      });
+
+      // print(await client.get(uriResponse.body.['uri']));
+    } catch (e) {
+      print(e);
+      return null;
+    } finally {
+      print('send !');
+      client.close();
+    }
+  }
+
+  // 카메라 호출 함수
+  takePicture(BuildContext context, int index) async {
+    // 사용가능한 카메라 목록 읽기
+    var cameras = await availableCameras();
+    // 첫 번째 카메라인 후면 카메라 사용
+    var firstCamera = cameras.first;
+
+    final cameraResult = await Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (context) => TakePictureScreen(
+                  camera: firstCamera,
+                )));
+
+    // if (!(cameraResult == '' || deviceList[index].firstPath != '')) {
+    if (cameraResult != '' && cameraResult != null) {
+      print(cameraResult.toString());
+      deviceList[index].firstPath = cameraResult.toString();
+      setState(() {});
+      // setState(() {
+      //   firstImagePath = cameraResult.toString();
+      // });
+    }
+  }
+
+  // 카메라 호출 함수
+  takePicture2(BuildContext context, int index) async {
+    // 사용가능한 카메라 목록 읽기
+    var cameras = await availableCameras();
+    // 첫 번째 카메라인 후면 카메라 사용
+    var firstCamera = cameras.first;
+
+    final cameraResult = await Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (context) => TakePictureScreen(
+                  camera: firstCamera,
+                )));
+
+    if (cameraResult != '' && cameraResult != null) {
+      print(cameraResult.toString());
+      deviceList[index].secondPath = cameraResult.toString();
+      setState(() {});
+      // setState(() {
+      //   secondImagePath = cameraResult.toString();
+      // });
+    }
   }
 
   void startRoutine(int index) async {
@@ -92,8 +164,18 @@ class ScanscreenState extends State<Scanscreen> {
                 [0x02, 0x04] +
                 timestamp)
             .toString());
-
-    var writeChararcteristics =
+    print('보내는 데이터 : ' +
+        Uint8List.fromList([
+                  0x55,
+                  0xaa,
+                  0x01,
+                  0x05,
+                ] +
+                deviceList[index].getMacAddress() +
+                [0x02, 0x04] +
+                timestamp)
+            .toString());
+    var writeCharacteristics =
         await deviceList[index].peripheral.writeCharacteristic(
             '00001000-0000-1000-8000-00805f9b34fb',
             '00001001-0000-1000-8000-00805f9b34fb',
@@ -104,15 +186,35 @@ class ScanscreenState extends State<Scanscreen> {
                   0x05,
                 ] +
                 deviceList[index].getMacAddress() +
-                [0x04, 0x04] +
+                [0x02, 0x04] +
                 timestamp),
             true);
-    sleep(Duration(seconds: 2));
+
     var readCharacteristics = await deviceList[index]
         .peripheral
         .readCharacteristic('00001000-0000-1000-8000-00805f9b34fb',
             '00001002-0000-1000-8000-00805f9b34fb');
     print('result: ' + readCharacteristics.value.toString());
+
+    // var stream = deviceList[index].peripheral.monitorCharacteristic(
+    //     '00001000-0000-1000-8000-00805f9b34fb',
+    //     '00001002-0000-1000-8000-00805f9b34fb');
+    // var sum = await sumData(stream);
+    // print('result@@' + sum);
+  }
+
+  Future<String> sumData(Stream<CharacteristicWithValue> stream) async {
+    var sum = '';
+    try {
+      await for (var value in stream) {
+        sum += value.value.toString() + '/';
+      }
+    } catch (e) {
+      print(e);
+      return 'error';
+    }
+
+    return sum;
   }
 
   // 타이머 시작
@@ -240,7 +342,7 @@ class ScanscreenState extends State<Scanscreen> {
               width: MediaQuery.of(context).size.width * 0.99,
               child: Column(children: [
                 Expanded(
-                  flex: 3,
+                  flex: 4,
                   child: Container(
                       padding: EdgeInsets.only(top: 5, left: 2),
                       width: MediaQuery.of(context).size.width * 0.98,
@@ -353,9 +455,54 @@ class ScanscreenState extends State<Scanscreen> {
                           //   ],
                           // )
                           ,
-                          Icon(
-                            Icons.image,
-                            size: MediaQuery.of(context).size.width * 0.15,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              deviceList[index].firstPath == ''
+                                  ? new IconButton(
+                                      iconSize:
+                                          MediaQuery.of(context).size.width *
+                                              0.15,
+                                      icon: Icon(
+                                        Icons.image,
+                                        size:
+                                            MediaQuery.of(context).size.width *
+                                                0.15,
+                                      ),
+                                      onPressed: () {
+                                        takePicture(context, index);
+                                      })
+                                  : Image.file(
+                                      File(deviceList[index].firstPath),
+                                      width: MediaQuery.of(context).size.width *
+                                          0.15,
+                                      height:
+                                          MediaQuery.of(context).size.width *
+                                              0.15,
+                                      fit: BoxFit.contain,
+                                    ),
+                              deviceList[index].secondPath == ''
+                                  ? new IconButton(
+                                      iconSize:
+                                          MediaQuery.of(context).size.width *
+                                              0.15,
+                                      icon: Icon(
+                                        Icons.image,
+                                        size:
+                                            MediaQuery.of(context).size.width *
+                                                0.15,
+                                      ),
+                                      onPressed: () {
+                                        takePicture2(context, index);
+                                      })
+                                  : Image.file(
+                                      File(deviceList[index].secondPath),
+                                      width: MediaQuery.of(context).size.width *
+                                          0.15,
+                                      height:
+                                          MediaQuery.of(context).size.width *
+                                              0.15)
+                            ],
                           )
                         ],
                       )),
@@ -492,7 +639,7 @@ class ScanscreenState extends State<Scanscreen> {
     if (!_isScanning) {
       deviceList.clear(); //기존 장치 리스트 초기화
       //SCAN 시작
-      print('listen!');
+
       _bleManager.startPeripheralScan().listen((scanResult) {
         //listen 이벤트 형식으로 장치가 발견되면 해당 루틴을 계속 탐.
         //periphernal.name이 없으면 advertisementData.localName확인 이것도 없다면 unknown으로 표시
@@ -507,6 +654,29 @@ class ScanscreenState extends State<Scanscreen> {
             element.peripheral = scanResult.peripheral;
             element.advertisementData = scanResult.advertisementData;
             element.rssi = scanResult.rssi;
+
+            if (currentLocation != null) {
+              BleDeviceItem currentItem = new BleDeviceItem(
+                  name,
+                  scanResult.rssi,
+                  scanResult.peripheral,
+                  scanResult.advertisementData,
+                  'scan');
+
+              Data sendData = new Data(
+                battery: currentItem.getBattery().toString(),
+                deviceName:
+                    'OPBT-' + currentItem.getDeviceId().toString().substring(7),
+                humi: currentItem.getHumidity().toString(),
+                temper: currentItem.getTemperature().toString(),
+                lat: currentLocation.latitude.toString() ?? '',
+                lng: currentLocation.longitude.toString() ?? '',
+                time: new DateTime.now().toString(),
+                lex: '',
+              );
+              // sendtoServer(sendData);
+            }
+
             return true;
           }
           return false;
@@ -517,14 +687,24 @@ class ScanscreenState extends State<Scanscreen> {
           if (name != "Unknown") {
             // print(name);
             // if (name.substring(0, 3) == 'IOT') {
-            if (name.substring(0, 4) == 'T301')
-              deviceList.add(BleDeviceItem(name, scanResult.rssi,
-                  scanResult.peripheral, scanResult.advertisementData, 'scan'));
-            // print(scanResult.peripheral.name +
-            //     "의 advertiseData  \n" +
-            // }
+            if (name.substring(0, 4) == 'T301') {
+              BleDeviceItem currentItem = new BleDeviceItem(
+                  name,
+                  scanResult.rssi,
+                  scanResult.peripheral,
+                  scanResult.advertisementData,
+                  'scan');
+              deviceList.add(currentItem);
+
+              //print(scanResult.advertisementData.manufacturerData.toString());
+              // print(scanResult.peripheral.name +
+              //     "의 advertiseData  \n"
+              // }
+            }
           }
         }
+        //55 aa - 01 05 - a4 c1 38 ec 59 06 - 01 - 07 - 08 b6 17 70 61 00 01
+        //55 aa - 01 05 - a4 c1 38 ec 59 06 - 02 - 04 - 60 43 24 96
         //페이지 갱신용
         setState(() {});
       });
@@ -662,7 +842,7 @@ class ScanscreenState extends State<Scanscreen> {
 
       //연결 시작!
       await peripheral
-          .connect(isAutoConnect: true, refreshGatt: true)
+          .connect(isAutoConnect: false, refreshGatt: true)
           .then((_) {
         this._curPeripheral = peripheral;
         //연결이 되면 장치의 모든 서비스와 캐릭터리스틱을 검색한다.
@@ -720,7 +900,8 @@ class ScanscreenState extends State<Scanscreen> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-        title: 'Sigmawit',
+        debugShowCheckedModeBanner: false,
+        title: 'OPBT',
         theme: ThemeData(
           // primarySwatch: Colors.grey,
           primaryColor: Color.fromRGBO(0x61, 0xB2, 0xD0, 1),
@@ -734,7 +915,7 @@ class ScanscreenState extends State<Scanscreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(
-                'Orior',
+                'OPBT',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontWeight: FontWeight.w300),
               ),
@@ -855,7 +1036,6 @@ class ScanscreenState extends State<Scanscreen> {
   _checkPermissionCamera() async {
     if (Platform.isAndroid) {
       if (await Permission.camera.request().isGranted) {
-        print('입장하냐?');
         scan();
         return '';
       }

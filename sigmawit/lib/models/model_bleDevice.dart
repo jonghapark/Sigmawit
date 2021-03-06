@@ -11,6 +11,8 @@ class BleDeviceItem {
   int rssi;
   AdvertisementData advertisementData;
   String connectionState;
+  String firstPath = '';
+  String secondPath = '';
   BleDeviceItem(this.deviceName, this.rssi, this.peripheral,
       this.advertisementData, this.connectionState);
 
