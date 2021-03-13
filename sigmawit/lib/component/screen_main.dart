@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:sigmawit/component/screen_detail.dart';
 import '../models/model_bleDevice.dart';
 import '../utils/util.dart';
 import 'dart:typed_data';
@@ -34,6 +35,8 @@ class ScanscreenState extends State<Scanscreen> {
   loc.Location location = new loc.Location();
   int processState = 1;
   StreamSubscription<loc.LocationData> _locationSubscription;
+  StreamSubscription monitoringStreamSubscription;
+
   String _error;
   String geolocation;
   String currentDeviceName = '';
@@ -140,7 +143,68 @@ class ScanscreenState extends State<Scanscreen> {
     }
   }
 
+  Future<void> monitorCharacteristic(Peripheral peripheral) async {
+    await _runWithErrorHandling(() async {
+      Service service = await peripheral.services().then((services) =>
+          services.firstWhere((service) =>
+              service.uuid == '00001000-0000-1000-8000-00805f9b34fb'));
+
+      List<Characteristic> characteristics = await service.characteristics();
+      Characteristic characteristic = characteristics.firstWhere(
+          (characteristic) =>
+              characteristic.uuid == '00001002-0000-1000-8000-00805f9b34fb');
+
+      _startMonitoringTemperature(
+          characteristic.monitor(transactionId: "monitor"), peripheral);
+    });
+  }
+
+  Uint8List getMinMaxTimestamp(Uint8List notifyResult) {
+    return notifyResult.sublist(12, 18);
+  }
+
+  void _stopMonitoringTemperature() async {
+    monitoringStreamSubscription.cancel();
+  }
+
+  void _startMonitoringTemperature(
+      Stream<Uint8List> characteristicUpdates, Peripheral peripheral) async {
+    await monitoringStreamSubscription?.cancel();
+    monitoringStreamSubscription = characteristicUpdates.listen(
+      (notifyResult) async {
+        print(notifyResult.toString());
+
+        if (notifyResult[10] == 0x03) {
+          int index = -1;
+          for (var i = 0; i < deviceList.length; i++) {
+            if (deviceList[i].peripheral.identifier == peripheral.identifier) {
+              index = i;
+              break;
+            }
+          }
+
+          if (index != -1) {
+            Uint8List minmaxStamp = getMinMaxTimestamp(notifyResult);
+            await _stopMonitoringTemperature();
+
+            Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => DetailScreen(
+                        currentDevice: deviceList[index],
+                        minmaxStamp: minmaxStamp)));
+          }
+        }
+      },
+      onError: (error) {
+        print("Error while monitoring characteristic \n$error");
+      },
+      cancelOnError: true,
+    );
+  }
+
   void startRoutine(int index) async {
+    monitorCharacteristic(deviceList[index].peripheral);
     String unixTimestamp =
         (DateTime.now().toUtc().millisecondsSinceEpoch / 1000)
             .toInt()
@@ -153,68 +217,19 @@ class ScanscreenState extends State<Scanscreen> {
       int.parse(unixTimestamp.substring(4, 6), radix: 16),
       int.parse(unixTimestamp.substring(6, 8), radix: 16),
     ]);
-    print('4' +
-        Uint8List.fromList([
-                  0x55,
-                  0xaa,
-                  0x01,
-                  0x05,
-                ] +
-                deviceList[index].getMacAddress() +
-                [0x02, 0x04] +
-                timestamp)
-            .toString());
-    print('보내는 데이터 : ' +
-        Uint8List.fromList([
-                  0x55,
-                  0xaa,
-                  0x01,
-                  0x05,
-                ] +
-                deviceList[index].getMacAddress() +
-                [0x02, 0x04] +
-                timestamp)
-            .toString());
-    var writeCharacteristics =
-        await deviceList[index].peripheral.writeCharacteristic(
+
+    Uint8List macaddress = deviceList[index].getMacAddress();
+
+    var writeCharacteristics = await deviceList[index]
+        .peripheral
+        .writeCharacteristic(
             '00001000-0000-1000-8000-00805f9b34fb',
             '00001001-0000-1000-8000-00805f9b34fb',
-            Uint8List.fromList([
-                  0x55,
-                  0xaa,
-                  0x01,
-                  0x05,
-                ] +
+            Uint8List.fromList([0x55, 0xAA, 0x01, 0x05] +
                 deviceList[index].getMacAddress() +
                 [0x02, 0x04] +
                 timestamp),
             true);
-
-    var readCharacteristics = await deviceList[index]
-        .peripheral
-        .readCharacteristic('00001000-0000-1000-8000-00805f9b34fb',
-            '00001002-0000-1000-8000-00805f9b34fb');
-    print('result: ' + readCharacteristics.value.toString());
-
-    // var stream = deviceList[index].peripheral.monitorCharacteristic(
-    //     '00001000-0000-1000-8000-00805f9b34fb',
-    //     '00001002-0000-1000-8000-00805f9b34fb');
-    // var sum = await sumData(stream);
-    // print('result@@' + sum);
-  }
-
-  Future<String> sumData(Stream<CharacteristicWithValue> stream) async {
-    var sum = '';
-    try {
-      await for (var value in stream) {
-        sum += value.value.toString() + '/';
-      }
-    } catch (e) {
-      print(e);
-      return 'error';
-    }
-
-    return sum;
   }
 
   // 타이머 시작
