@@ -65,6 +65,7 @@ class ScanscreenState extends State<Scanscreen> {
   @override
   void dispose() {
     // ->> 사라진 위젯에서 cancel하려고 해서 에러 발생
+    _stopMonitoringTemperature();
     super.dispose();
   }
 
@@ -173,7 +174,6 @@ class ScanscreenState extends State<Scanscreen> {
     monitoringStreamSubscription = characteristicUpdates.listen(
       (notifyResult) async {
         print(notifyResult.toString());
-
         if (notifyResult[10] == 0x03) {
           int index = -1;
           for (var i = 0; i < deviceList.length; i++) {
@@ -204,13 +204,11 @@ class ScanscreenState extends State<Scanscreen> {
   }
 
   void startRoutine(int index) async {
-    monitorCharacteristic(deviceList[index].peripheral);
+    await monitorCharacteristic(deviceList[index].peripheral);
     String unixTimestamp =
         (DateTime.now().toUtc().millisecondsSinceEpoch / 1000)
             .toInt()
             .toRadixString(16);
-    print('2' + deviceList[index].getMacAddress().toString());
-
     Uint8List timestamp = Uint8List.fromList([
       int.parse(unixTimestamp.substring(0, 2), radix: 16),
       int.parse(unixTimestamp.substring(2, 4), radix: 16),
@@ -219,7 +217,7 @@ class ScanscreenState extends State<Scanscreen> {
     ]);
 
     Uint8List macaddress = deviceList[index].getMacAddress();
-
+    print('쓰기 시작 ');
     var writeCharacteristics = await deviceList[index]
         .peripheral
         .writeCharacteristic(
@@ -822,6 +820,7 @@ class ScanscreenState extends State<Scanscreen> {
             //해제됨
             _connected = false;
             print("${peripheral.name} has DISCONNECTED");
+            _stopMonitoringTemperature();
             deviceList[index].connectionState = 'scan';
             setBLEState('<연결 종료>');
             if (processState == 2) {

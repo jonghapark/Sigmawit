@@ -8,6 +8,8 @@ import 'package:location/location.dart' as loc;
 import 'package:geocoder/geocoder.dart';
 import 'package:intl/intl.dart';
 import 'package:sigmawit/models/model_logdata.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
+import 'package:syncfusion_flutter_charts/sparkcharts.dart';
 
 class DetailScreen extends StatefulWidget {
   final BleDeviceItem currentDevice;
@@ -21,10 +23,13 @@ class DetailScreen extends StatefulWidget {
 
 class _DetailScreenState extends State<DetailScreen> {
   StreamSubscription monitoringStreamSubscription;
+  bool dataFetchEnd = false;
+  List<LogData> fetchDatas = [];
 
   @override
   void initState() {
     super.initState();
+    fetchLogData();
   }
 
   getLogTime(Uint8List fetchData) {
@@ -49,9 +54,8 @@ class _DetailScreenState extends State<DetailScreen> {
     return tmp / 100;
   }
 
-  Future<List<LogData>> fetchLogData() async {
+  fetchLogData() async {
     await monitorCharacteristic(widget.currentDevice.peripheral);
-    print('끝');
     var writeCharacteristics = await widget.currentDevice.peripheral
         .writeCharacteristic(
             '00001000-0000-1000-8000-00805f9b34fb',
@@ -69,10 +73,15 @@ class _DetailScreenState extends State<DetailScreen> {
     monitoringStreamSubscription = characteristicUpdates.listen(
       (notifyResult) async {
         print(notifyResult.toString());
-
         if (notifyResult[10] == 0x05) {
           //TODO: 데이터 읽어오기
-
+          fetchDatas.add(transformData(notifyResult));
+        }
+        // DataFetch End
+        else if (notifyResult[10] == 0x06) {
+          setState(() {
+            dataFetchEnd = true;
+          });
         }
       },
       onError: (error) {
@@ -82,7 +91,11 @@ class _DetailScreenState extends State<DetailScreen> {
     );
   }
 
+  //Datalog Parsing
   LogData transformData(Uint8List notifyResult) {
+    print('온도 : ' + getLogTemperature(notifyResult).toString());
+    print('습도 : ' + getLogHumidity(notifyResult).toString());
+    print('시간 : ' + getLogTime(notifyResult).toString());
     return new LogData(
         temperature: getLogTemperature(notifyResult),
         humidity: getLogHumidity(notifyResult),
@@ -101,7 +114,7 @@ class _DetailScreenState extends State<DetailScreen> {
               characteristic.uuid == '00001002-0000-1000-8000-00805f9b34fb');
 
       _startMonitoringTemperature(
-          characteristic.monitor(transactionId: "monitor"), peripheral);
+          characteristic.monitor(transactionId: "monitor2"), peripheral);
     });
   }
 
@@ -146,31 +159,52 @@ class _DetailScreenState extends State<DetailScreen> {
             body: Center(
                 child: Column(
               children: [
-                FutureBuilder(
-                    future: fetchLogData(),
-                    builder: (BuildContext context, AsyncSnapshot snapshot) {
-                      if (snapshot.hasData == false) {
-                        return CircularProgressIndicator(
-                          semanticsLabel: '데이터 로드 중',
-                          semanticsValue: '10%',
-                        );
-                      } else if (snapshot.hasError) {
-                        return Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Text(
-                              'Error : ${snapshot.error}',
-                              style: TextStyle(fontSize: 15),
-                            ));
-                      } else {
-                        return Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Text(
-                            snapshot.data.toString(),
-                            style: TextStyle(fontSize: 15),
-                          ),
-                        );
-                      }
-                    }),
+                dataFetchEnd == false
+                    ? CircularProgressIndicator()
+                    : Container(
+                        child: Column(
+                        children: [
+                          SfCartesianChart(
+                              primaryXAxis: CategoryAxis(),
+                              // Chart title
+                              title: ChartTitle(text: '온도/습도 그래프'),
+                              // Enable legend
+                              legend: Legend(isVisible: false),
+                              // Enable tooltip
+                              tooltipBehavior: TooltipBehavior(enable: true),
+                              series: <ChartSeries<LogData, String>>[
+                                LineSeries<LogData, String>(
+                                    dataSource: fetchDatas.sublist(0, 30),
+                                    xValueMapper: (LogData data, _) =>
+                                        data.timestamp.toString(),
+                                    yValueMapper: (LogData data, _) =>
+                                        data.temperature,
+                                    name: '온도',
+                                    // Enable data label
+                                    dataLabelSettings:
+                                        DataLabelSettings(isVisible: true))
+                              ]),
+                          // Padding(
+                          //   padding: const EdgeInsets.all(8.0),
+                          //   //Initialize the spark charts widget
+                          //   child: SfSparkLineChart.custom(
+                          //     //Enable the trackball
+                          //     trackball: SparkChartTrackball(
+                          //         activationMode: SparkChartActivationMode.tap),
+                          //     //Enable marker
+                          //     marker: SparkChartMarker(
+                          //         displayMode: SparkChartMarkerDisplayMode.all),
+                          //     //Enable data label
+                          //     labelDisplayMode: SparkChartLabelDisplayMode.all,
+                          //     xValueMapper: (int index) =>
+                          //         fetchDatas[index].timestamp,
+                          //     yValueMapper: (int index) =>
+                          //         fetchDatas[index].temperature,
+                          //     dataCount: 5,
+                          //   ),
+                          // )
+                        ],
+                      ))
               ],
             ))));
   }
