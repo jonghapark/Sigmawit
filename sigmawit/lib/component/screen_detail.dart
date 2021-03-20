@@ -9,7 +9,7 @@ import 'package:geocoder/geocoder.dart';
 import 'package:intl/intl.dart';
 import 'package:sigmawit/models/model_logdata.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
-import 'package:syncfusion_flutter_charts/sparkcharts.dart';
+import 'package:tab_indicator_styler/tab_indicator_styler.dart';
 
 class DetailScreen extends StatefulWidget {
   final BleDeviceItem currentDevice;
@@ -25,6 +25,7 @@ class _DetailScreenState extends State<DetailScreen> {
   StreamSubscription monitoringStreamSubscription;
   bool dataFetchEnd = false;
   List<LogData> fetchDatas = [];
+  DateTimeIntervalType currentType = DateTimeIntervalType.days;
 
   @override
   void initState() {
@@ -32,25 +33,39 @@ class _DetailScreenState extends State<DetailScreen> {
     fetchLogData();
   }
 
+  DateTimeIntervalType toggleType(int index) {
+    if (index == 0)
+      return DateTimeIntervalType.hours;
+    else if (index == 1)
+      return DateTimeIntervalType.days;
+    else if (index == 2)
+      return DateTimeIntervalType.days;
+    else if (index == 3)
+      return DateTimeIntervalType.months;
+    else
+      return DateTimeIntervalType.years;
+  }
+
   getLogTime(Uint8List fetchData) {
     int tmp =
         ByteData.sublistView(fetchData.sublist(12, 16)).getInt32(0, Endian.big);
-    // print(tmp);
-    DateTime time = DateTime.fromMicrosecondsSinceEpoch(tmp);
+    DateTime time =
+        DateTime.fromMillisecondsSinceEpoch(tmp * 1000, isUtc: true);
+
     return time;
   }
 
   getLogHumidity(Uint8List fetchData) {
     int tmp =
         ByteData.sublistView(fetchData.sublist(18, 20)).getInt16(0, Endian.big);
-    // print(tmp);
+
     return tmp / 100;
   }
 
   getLogTemperature(Uint8List fetchData) {
     int tmp =
         ByteData.sublistView(fetchData.sublist(16, 18)).getInt16(0, Endian.big);
-    // print(tmp);
+
     return tmp / 100;
   }
 
@@ -72,7 +87,7 @@ class _DetailScreenState extends State<DetailScreen> {
     await monitoringStreamSubscription?.cancel();
     monitoringStreamSubscription = characteristicUpdates.listen(
       (notifyResult) async {
-        print(notifyResult.toString());
+        // print(notifyResult.toString());
         if (notifyResult[10] == 0x05) {
           //TODO: 데이터 읽어오기
           fetchDatas.add(transformData(notifyResult));
@@ -93,9 +108,9 @@ class _DetailScreenState extends State<DetailScreen> {
 
   //Datalog Parsing
   LogData transformData(Uint8List notifyResult) {
-    print('온도 : ' + getLogTemperature(notifyResult).toString());
-    print('습도 : ' + getLogHumidity(notifyResult).toString());
-    print('시간 : ' + getLogTime(notifyResult).toString());
+    // print('온도 : ' + getLogTemperature(notifyResult).toString());
+    // print('습도 : ' + getLogHumidity(notifyResult).toString());
+    // print('시간 : ' + getLogTime(notifyResult).toString());
     return new LogData(
         temperature: getLogTemperature(notifyResult),
         humidity: getLogHumidity(notifyResult),
@@ -158,51 +173,118 @@ class _DetailScreenState extends State<DetailScreen> {
             )),
             body: Center(
                 child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                DefaultTabController(
+                    length: 5,
+                    initialIndex: 1,
+                    child: Center(
+                        child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 1),
+                            child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: <Widget>[
+                                  Material(
+                                    child: TabBar(
+                                      onTap: (index) => {
+                                        setState(() {
+                                          currentType = toggleType(index);
+                                        })
+                                      },
+                                      indicatorColor: Colors.green,
+                                      tabs: [
+                                        Tab(
+                                          text: "Hour",
+                                        ),
+                                        Tab(
+                                          text: "Day",
+                                        ),
+                                        Tab(
+                                          text: "Week",
+                                        ),
+                                        Tab(
+                                          text: "Month",
+                                        ),
+                                        Tab(
+                                          text: "Year",
+                                        ),
+                                      ],
+                                      labelColor: Colors.black,
+                                      indicator: MaterialIndicator(
+                                        height: 5,
+                                        topLeftRadius: 8,
+                                        topRightRadius: 8,
+                                        horizontalPadding: 5,
+                                        tabPosition: TabPosition.bottom,
+                                      ),
+                                    ),
+                                  )
+                                ])))),
                 dataFetchEnd == false
                     ? CircularProgressIndicator()
                     : Container(
                         child: Column(
+                        mainAxisAlignment: MainAxisAlignment.start,
                         children: [
                           SfCartesianChart(
-                              primaryXAxis: CategoryAxis(),
+                              primaryXAxis: DateTimeAxis(
+                                  labelRotation: 5,
+                                  maximumLabels: 5,
+                                  // Set name for x axis in order to use it in the callback event.
+                                  name: 'primaryXAxis',
+                                  intervalType: currentType,
+                                  majorGridLines: MajorGridLines(width: 0.1)),
+                              primaryYAxis:
+                                  NumericAxis(interval: 2, maximum: 30),
                               // Chart title
-                              title: ChartTitle(text: '온도/습도 그래프'),
+                              title: ChartTitle(text: '온도 그래프'),
                               // Enable legend
                               legend: Legend(isVisible: false),
                               // Enable tooltip
                               tooltipBehavior: TooltipBehavior(enable: true),
-                              series: <ChartSeries<LogData, String>>[
-                                LineSeries<LogData, String>(
-                                    dataSource: fetchDatas.sublist(0, 30),
-                                    xValueMapper: (LogData data, _) =>
-                                        data.timestamp.toString(),
+                              series: <ChartSeries<LogData, DateTime>>[
+                                LineSeries<LogData, DateTime>(
+                                    dataSource: fetchDatas.sublist(
+                                        fetchDatas.length - 1000,
+                                        fetchDatas.length - 1),
+                                    xValueMapper: (LogData data, _) {
+                                      return data.timestamp;
+                                    },
                                     yValueMapper: (LogData data, _) =>
                                         data.temperature,
                                     name: '온도',
                                     // Enable data label
                                     dataLabelSettings:
-                                        DataLabelSettings(isVisible: true))
+                                        DataLabelSettings(isVisible: false))
                               ]),
-                          // Padding(
-                          //   padding: const EdgeInsets.all(8.0),
-                          //   //Initialize the spark charts widget
-                          //   child: SfSparkLineChart.custom(
-                          //     //Enable the trackball
-                          //     trackball: SparkChartTrackball(
-                          //         activationMode: SparkChartActivationMode.tap),
-                          //     //Enable marker
-                          //     marker: SparkChartMarker(
-                          //         displayMode: SparkChartMarkerDisplayMode.all),
-                          //     //Enable data label
-                          //     labelDisplayMode: SparkChartLabelDisplayMode.all,
-                          //     xValueMapper: (int index) =>
-                          //         fetchDatas[index].timestamp,
-                          //     yValueMapper: (int index) =>
-                          //         fetchDatas[index].temperature,
-                          //     dataCount: 5,
-                          //   ),
-                          // )
+                          SfCartesianChart(
+                              primaryXAxis: DateTimeAxis(
+                                  // Set name for x axis in order to use it in the callback event.
+                                  name: 'primaryXAxis',
+                                  intervalType: DateTimeIntervalType.auto,
+                                  majorGridLines: MajorGridLines(width: 0.1)),
+                              primaryYAxis: NumericAxis(interval: 20),
+                              // Chart title
+                              title: ChartTitle(text: '습도 그래프'),
+                              // Enable legend
+                              legend: Legend(isVisible: false),
+                              // Enable tooltip
+                              tooltipBehavior: TooltipBehavior(enable: true),
+                              series: <ChartSeries<LogData, DateTime>>[
+                                LineSeries<LogData, DateTime>(
+                                    dataSource: fetchDatas.sublist(
+                                        fetchDatas.length - 1000,
+                                        fetchDatas.length - 1),
+                                    xValueMapper: (LogData data, _) {
+                                      return data.timestamp;
+                                    },
+                                    yValueMapper: (LogData data, _) =>
+                                        data.humidity,
+                                    name: '습도',
+                                    // Enable data label
+                                    dataLabelSettings:
+                                        DataLabelSettings(isVisible: false))
+                              ]),
                         ],
                       ))
               ],

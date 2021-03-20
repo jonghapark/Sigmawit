@@ -456,6 +456,13 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "18.4.48"
+  tab_indicator_styler:
+    dependency: "direct main"
+    description:
+      name: tab_indicator_styler
+      url: "https://pub.dartlang.org"
+    source: hosted
+    version: "1.0.0"
   term_glyph:
     dependency: transitive
     description:

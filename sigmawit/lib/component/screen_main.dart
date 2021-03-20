@@ -165,12 +165,13 @@ class ScanscreenState extends State<Scanscreen> {
   }
 
   void _stopMonitoringTemperature() async {
-    monitoringStreamSubscription.cancel();
+    monitoringStreamSubscription?.cancel();
   }
 
   void _startMonitoringTemperature(
       Stream<Uint8List> characteristicUpdates, Peripheral peripheral) async {
-    await monitoringStreamSubscription?.cancel();
+    monitoringStreamSubscription?.cancel();
+
     monitoringStreamSubscription = characteristicUpdates.listen(
       (notifyResult) async {
         print(notifyResult.toString());
@@ -185,6 +186,7 @@ class ScanscreenState extends State<Scanscreen> {
 
           if (index != -1) {
             Uint8List minmaxStamp = getMinMaxTimestamp(notifyResult);
+            print('여기 걸리나 ?');
             await _stopMonitoringTemperature();
 
             Navigator.push(
@@ -345,7 +347,10 @@ class ScanscreenState extends State<Scanscreen> {
       itemCount: deviceList.length,
       itemBuilder: (BuildContext context, int index) {
         return InkWell(
-            onTap: () => connect(index),
+            onTap: () async {
+              await connect(index);
+              // await startRoutine(index);
+            },
             child: Container(
               decoration: BoxDecoration(
                   color: Colors.white,
@@ -384,90 +389,6 @@ class ScanscreenState extends State<Scanscreen> {
                               ),
                             ],
                           ),
-                          deviceList[index].connectionState == 'connect'
-                              ? Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Container(
-                                        width:
-                                            MediaQuery.of(context).size.width *
-                                                0.3,
-                                        height:
-                                            MediaQuery.of(context).size.width *
-                                                0.10,
-                                        decoration: BoxDecoration(
-                                          border: Border(),
-                                        ),
-                                        child: RaisedButton(
-                                          //padding: EdgeInsets.all(1),
-                                          onPressed: () {
-                                            startRoutine(index);
-                                          },
-                                          shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.all(
-                                                  Radius.circular(0))),
-                                          color: Color.fromRGBO(22, 33, 55, 1),
-                                          child: Container(
-                                            child: Text('측정 시작',
-                                                style: this.btnTextStyle),
-                                          ),
-                                        )),
-                                    Container(
-                                        width:
-                                            MediaQuery.of(context).size.width *
-                                                0.3,
-                                        height:
-                                            MediaQuery.of(context).size.width *
-                                                0.10,
-                                        decoration: BoxDecoration(
-                                          border: Border(),
-                                        ),
-                                        child: RaisedButton(
-                                          //padding: EdgeInsets.all(1),
-                                          onPressed: () async {},
-                                          shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.all(
-                                                  Radius.circular(0))),
-                                          color: Color.fromRGBO(22, 33, 55, 1),
-                                          child: Container(
-                                            child: Text('측정 종료',
-                                                style: this.btnTextStyle),
-                                          ),
-                                        ))
-                                  ],
-                                )
-                              : SizedBox()
-                          // Row(
-                          //   mainAxisAlignment: MainAxisAlignment.center,
-                          //   children: [
-                          //     ToggleSwitch(
-                          //       // initialLabelIndex:
-                          //       //     deviceList[index].sendState == true ||
-                          //       //             deviceList[index].sendState == null
-                          //       //         ? 0
-                          //       //         : 1,
-                          //       minWidth: 100.0,
-                          //       cornerRadius: 20.0,
-                          //       activeBgColor: Colors.cyan,
-                          //       activeFgColor: Colors.white,
-                          //       inactiveBgColor: Colors.grey,
-                          //       inactiveFgColor: Colors.white,
-                          //       labels: ['ON', 'OFF'],
-                          //       icons: [Icons.check, Icons.highlight_off],
-                          //       onToggle: (index) async {
-                          //         if (index == 0) {
-                          //           deviceList[index].sendState = true;
-                          //           setState(() {});
-                          //         } else {
-                          //           deviceList[index].sendState = false;
-                          //           setState(() {});
-                          //         }
-                          //       },
-                          //     ),
-                          //   ],
-                          // )
-                          ,
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
@@ -777,6 +698,7 @@ class ScanscreenState extends State<Scanscreen> {
         case PeripheralConnectionState.connected:
           {
             //연결됨
+            print('연결 완료 !');
             _curPeripheral = peripheral;
             getCurrentLocation();
             //peripheral.
@@ -785,26 +707,27 @@ class ScanscreenState extends State<Scanscreen> {
             setState(() {
               processState = 3;
             });
+            // startRoutine(index);
             Stream<CharacteristicWithValue> characteristicUpdates;
 
             print('결과 ' + characteristicUpdates.toString());
 
-            //데이터 받는 리스너 핸들 변수
-            StreamSubscription monitoringStreamSubscription;
+            // //데이터 받는 리스너 핸들 변수
+            // StreamSubscription monitoringStreamSubscription;
 
-            //이미 리스너가 있다면 취소
-            //  await monitoringStreamSubscription?.cancel();
-            // ?. = 해당객체가 null이면 무시하고 넘어감.
+            // //이미 리스너가 있다면 취소
+            // //  await monitoringStreamSubscription?.cancel();
+            // // ?. = 해당객체가 null이면 무시하고 넘어감.
 
-            monitoringStreamSubscription = characteristicUpdates.listen(
-              (value) {
-                print("read data : ${value.value}"); //데이터 출력
-              },
-              onError: (error) {
-                print("Error while monitoring characteristic \n$error"); //실패시
-              },
-              cancelOnError: true, //에러 발생시 자동으로 listen 취소
-            );
+            // monitoringStreamSubscription = characteristicUpdates.listen(
+            //   (value) {
+            //     print("read data : ${value.value}"); //데이터 출력
+            //   },
+            //   onError: (error) {
+            //     print("Error while monitoring characteristic \n$error"); //실패시
+            //   },
+            //   cancelOnError: true, //에러 발생시 자동으로 listen 취소
+            // );
             // peripheral.writeCharacteristic(BLE_SERVICE_UUID, characteristicUuid, value, withResponse)
           }
           break;
@@ -875,6 +798,7 @@ class ScanscreenState extends State<Scanscreen> {
             }
           }
           //모든 과정이 마무리되면 연결되었다고 표시
+          startRoutine(index);
           _connected = true;
           _isScanning = true;
           setState(() {});
