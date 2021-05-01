@@ -54,7 +54,7 @@ class ScanscreenState extends State<Scanscreen> {
   @override
   void initState() {
     super.initState();
-    // getCurrentLocation();
+    getCurrentLocation();
     currentDeviceName = '';
     currentTemp = '-';
     currentHumi = '-';
@@ -334,7 +334,7 @@ class ScanscreenState extends State<Scanscreen> {
       print("여기는요?" + statuses[Permission.location].toString());
       if (statuses[Permission.location].toString() ==
           "PermissionStatus.granted") {
-        //getCurrentLocation();
+        getCurrentLocation();
         scan();
       }
     }
@@ -348,7 +348,9 @@ class ScanscreenState extends State<Scanscreen> {
       itemBuilder: (BuildContext context, int index) {
         return InkWell(
             onTap: () async {
-              await connect(index);
+              //TODO: T301 에서는 해제
+              // await connect(index);
+
               // await startRoutine(index);
             },
             child: Container(
@@ -580,6 +582,7 @@ class ScanscreenState extends State<Scanscreen> {
         //listen 이벤트 형식으로 장치가 발견되면 해당 루틴을 계속 탐.
         //periphernal.name이 없으면 advertisementData.localName확인 이것도 없다면 unknown으로 표시
         //print(scanResult.peripheral.name);
+
         var name = scanResult.peripheral.name ??
             scanResult.advertisementData.localName ??
             "Unknown";
@@ -587,10 +590,20 @@ class ScanscreenState extends State<Scanscreen> {
         var findDevice = deviceList.any((element) {
           if (element.peripheral.identifier ==
               scanResult.peripheral.identifier) {
-            element.peripheral = scanResult.peripheral;
-            element.advertisementData = scanResult.advertisementData;
-            element.rssi = scanResult.rssi;
-
+            if (scanResult.peripheral.identifier.substring(0, 8) ==
+                'AC:23:3F') {
+              if (scanResult.advertisementData.manufacturerData.length == 18) {
+                element.peripheral = scanResult.peripheral;
+                element.advertisementData = scanResult.advertisementData;
+                element.rssi = scanResult.rssi;
+              }
+            } else {
+              element.peripheral = scanResult.peripheral;
+              element.advertisementData = scanResult.advertisementData;
+              element.rssi = scanResult.rssi;
+            }
+            print("현재위치");
+            print(currentLocation.latitude.toString());
             if (currentLocation != null) {
               BleDeviceItem currentItem = new BleDeviceItem(
                   name,
@@ -601,8 +614,7 @@ class ScanscreenState extends State<Scanscreen> {
 
               Data sendData = new Data(
                 battery: currentItem.getBattery().toString(),
-                deviceName:
-                    'OP_' + currentItem.getDeviceId().toString().substring(7),
+                deviceName: 'S3_' + currentItem.getDeviceId(),
                 humi: currentItem.getHumidity().toString(),
                 temper: currentItem.getTemperature().toString(),
                 lat: currentLocation.latitude.toString() ?? '',
@@ -610,7 +622,7 @@ class ScanscreenState extends State<Scanscreen> {
                 time: new DateTime.now().toString(),
                 lex: '',
               );
-              // sendtoServer(sendData);
+              sendtoServer(sendData);
             }
 
             return true;
@@ -619,10 +631,19 @@ class ScanscreenState extends State<Scanscreen> {
         });
         // 새로 발견된 장치면 추가
         if (!findDevice) {
+          //TODO: S3 모델의 경우
           if (scanResult.peripheral.identifier.substring(0, 8) == 'AC:23:3F') {
-            print('이거임 : ' +
-                scanResult.advertisementData.manufacturerData.toString());
+            BleDeviceItem currentItem = new BleDeviceItem(name, scanResult.rssi,
+                scanResult.peripheral, scanResult.advertisementData, 'scan');
+
+            if (scanResult.advertisementData.manufacturerData.length == 18) {
+              deviceList.add(currentItem);
+              setState(() {});
+            }
           }
+          // battery : 4, temp : 5,6  , humi : 7,8
+          //57, 6, 163, 1, 1, 0, 18, 0, 1, 0, 1, 1, 0, 0, 128, 200, 164, 63, 35, 172, 120, 30
+
           if (name != "Unknowns") {
             // print(name);
             // if (name.substring(0, 3) == 'IOT') {
@@ -633,7 +654,8 @@ class ScanscreenState extends State<Scanscreen> {
                   scanResult.peripheral,
                   scanResult.advertisementData,
                   'scan');
-              deviceList.add(currentItem);
+              //TODO : T301 에선 주석해제
+              // deviceList.add(currentItem);
 
               //print(scanResult.advertisementData.manufacturerData.toString());
               // print(scanResult.peripheral.name +
