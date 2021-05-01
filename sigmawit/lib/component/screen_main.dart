@@ -58,8 +58,6 @@ class ScanscreenState extends State<Scanscreen> {
     currentDeviceName = '';
     currentTemp = '-';
     currentHumi = '-';
-
-    init();
   }
 
   @override
@@ -378,7 +376,7 @@ class ScanscreenState extends State<Scanscreen> {
                             children: [
                               Text(' '),
                               Image(
-                                image: AssetImage('images/T301.png'),
+                                image: AssetImage('images/S3.png'),
                                 fit: BoxFit.contain,
                                 width: MediaQuery.of(context).size.width * 0.10,
                                 height:
@@ -622,7 +620,16 @@ class ScanscreenState extends State<Scanscreen> {
                 time: new DateTime.now().toString(),
                 lex: '',
               );
-              sendtoServer(sendData);
+              // getCurrentLocation();
+              print(currentItem.getBattery().toString() +
+                  ' ' +
+                  currentItem.getTemperature().toString() +
+                  ' ' +
+                  currentItem.getHumidity().toString());
+              if (currentItem.getBattery().toString() == '1') {
+              } else {
+                sendtoServer(sendData);
+              }
             }
 
             return true;
@@ -1031,16 +1038,31 @@ class ScanscreenState extends State<Scanscreen> {
 
     _serviceEnabled = await location.serviceEnabled();
     if (!_serviceEnabled) {
+      print("request 1");
       _serviceEnabled = await location.requestService();
+      init();
       if (!_serviceEnabled) {
+        _locationData = await location.getLocation();
+        print('lat: ' + _locationData.latitude.toString());
+        setState(() {
+          currentLocation = _locationData;
+        });
         return;
       }
     }
 
     _permissionGranted = await location.hasPermission();
     if (_permissionGranted == loc.PermissionStatus.denied) {
+      print("request 2");
       _permissionGranted = await location.requestPermission();
-      if (_permissionGranted != loc.PermissionStatus.granted) {
+      print("승인 후 결과 " + _permissionGranted.toString());
+      init();
+      if (_permissionGranted == loc.PermissionStatus.granted) {
+        _locationData = await location.getLocation();
+        print('lat: ' + _locationData.latitude.toString());
+        setState(() {
+          currentLocation = _locationData;
+        });
         return;
       }
     }
@@ -1050,5 +1072,7 @@ class ScanscreenState extends State<Scanscreen> {
     setState(() {
       currentLocation = _locationData;
     });
+
+    init();
   }
 }
