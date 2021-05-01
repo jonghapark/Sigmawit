@@ -54,7 +54,7 @@ class ScanscreenState extends State<Scanscreen> {
   @override
   void initState() {
     super.initState();
-    getCurrentLocation();
+    // getCurrentLocation();
     currentDeviceName = '';
     currentTemp = '-';
     currentHumi = '-';
@@ -206,7 +206,7 @@ class ScanscreenState extends State<Scanscreen> {
   }
 
   void startRoutine(int index) async {
-    await monitorCharacteristic(deviceList[index].peripheral);
+    // await monitorCharacteristic(deviceList[index].peripheral);
     String unixTimestamp =
         (DateTime.now().toUtc().millisecondsSinceEpoch / 1000)
             .toInt()
@@ -574,7 +574,9 @@ class ScanscreenState extends State<Scanscreen> {
       deviceList.clear(); //기존 장치 리스트 초기화
       //SCAN 시작
 
-      _bleManager.startPeripheralScan().listen((scanResult) {
+      _bleManager
+          .startPeripheralScan(scanMode: ScanMode.balanced)
+          .listen((scanResult) {
         //listen 이벤트 형식으로 장치가 발견되면 해당 루틴을 계속 탐.
         //periphernal.name이 없으면 advertisementData.localName확인 이것도 없다면 unknown으로 표시
         //print(scanResult.peripheral.name);
@@ -600,7 +602,7 @@ class ScanscreenState extends State<Scanscreen> {
               Data sendData = new Data(
                 battery: currentItem.getBattery().toString(),
                 deviceName:
-                    'OPBT-' + currentItem.getDeviceId().toString().substring(7),
+                    'OP_' + currentItem.getDeviceId().toString().substring(7),
                 humi: currentItem.getHumidity().toString(),
                 temper: currentItem.getTemperature().toString(),
                 lat: currentLocation.latitude.toString() ?? '',
@@ -617,8 +619,11 @@ class ScanscreenState extends State<Scanscreen> {
         });
         // 새로 발견된 장치면 추가
         if (!findDevice) {
-          // print(name);
-          if (name != "Unknown") {
+          if (scanResult.peripheral.identifier.substring(0, 8) == 'AC:23:3F') {
+            print('이거임 : ' +
+                scanResult.advertisementData.manufacturerData.toString());
+          }
+          if (name != "Unknowns") {
             // print(name);
             // if (name.substring(0, 3) == 'IOT') {
             if (name.substring(0, 4) == 'T301') {
@@ -633,8 +638,16 @@ class ScanscreenState extends State<Scanscreen> {
               //print(scanResult.advertisementData.manufacturerData.toString());
               // print(scanResult.peripheral.name +
               //     "의 advertiseData  \n"
-              // }
             }
+            // else if (scanResult.peripheral.identifier.substring(0, 8) ==
+            //     'AC:23:3F') {
+            //   print('name : ' + scanResult.peripheral.name ?? '');
+            //   print('id : ' + scanResult.peripheral.identifier ?? '');
+            //   print('data : ' +
+            //           scanResult.advertisementData.manufacturerData
+            //               .toString() ??
+            //       '');
+            // }
           }
         }
         //55 aa - 01 05 - a4 c1 38 ec 59 06 - 01 - 07 - 08 b6 17 70 61 00 01
@@ -839,7 +852,7 @@ class ScanscreenState extends State<Scanscreen> {
   Widget build(BuildContext context) {
     return MaterialApp(
         debugShowCheckedModeBanner: false,
-        title: 'OPBT',
+        title: 'OPTILO',
         theme: ThemeData(
           // primarySwatch: Colors.grey,
           primaryColor: Color.fromRGBO(0x61, 0xB2, 0xD0, 1),
@@ -853,7 +866,7 @@ class ScanscreenState extends State<Scanscreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(
-                'OPBT',
+                'OPTILO',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontWeight: FontWeight.w300),
               ),
@@ -1001,7 +1014,7 @@ class ScanscreenState extends State<Scanscreen> {
         return;
       }
     }
-    print('서비스는사용가능? ');
+
     _permissionGranted = await location.hasPermission();
     if (_permissionGranted == loc.PermissionStatus.denied) {
       _permissionGranted = await location.requestPermission();
@@ -1009,7 +1022,7 @@ class ScanscreenState extends State<Scanscreen> {
         return;
       }
     }
-    print('위치받는중? ');
+
     _locationData = await location.getLocation();
     print('lat: ' + _locationData.latitude.toString());
     setState(() {
