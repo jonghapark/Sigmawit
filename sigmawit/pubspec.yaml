@@ -40,6 +40,7 @@ dependencies:
   path: ^1.7.0
   syncfusion_flutter_charts: ^18.4.44
   tab_indicator_styler: ^1.0.0
+  wakelock: ^0.5.1
   
 
 dev_dependencies:

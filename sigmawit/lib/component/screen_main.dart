@@ -14,6 +14,7 @@ import 'package:geocoder/geocoder.dart';
 import 'package:intl/intl.dart';
 import '../component/screen_camera.dart';
 import 'package:camera/camera.dart';
+import 'package:wakelock/wakelock.dart';
 
 class Scanscreen extends StatefulWidget {
   @override
@@ -54,6 +55,7 @@ class ScanscreenState extends State<Scanscreen> {
   @override
   void initState() {
     super.initState();
+    Wakelock.enable();
     getCurrentLocation();
     currentDeviceName = '';
     currentTemp = '-';
@@ -68,6 +70,13 @@ class ScanscreenState extends State<Scanscreen> {
   }
 
   Future<Post> sendtoServer(Data data) async {
+    // loc.LocationData _locationData;
+    // _locationData = await location.getLocation();
+    // print('lat: ' + _locationData.latitude.toString());
+    // setState(() {
+    //   currentLocation = _locationData;
+    // });
+
     var client = http.Client();
     try {
       var uriResponse =
@@ -76,8 +85,8 @@ class ScanscreenState extends State<Scanscreen> {
         "tra_datetime": data.time,
         "tra_temp": data.temper,
         "tra_humidity": data.humi,
-        "tra_lat": data.lat,
-        "tra_lon": data.lng,
+        "tra_lat": currentLocation.latitude.toString(),
+        "tra_lon": currentLocation.longitude.toString(),
         "de_number": data.deviceName,
         "tra_battery": data.battery,
         "tra_impact": data.lex
@@ -88,6 +97,7 @@ class ScanscreenState extends State<Scanscreen> {
       print(e);
       return null;
     } finally {
+      print(currentLocation.latitude.toString());
       print('send !');
       client.close();
     }
@@ -461,14 +471,14 @@ class ScanscreenState extends State<Scanscreen> {
                                         AssetImage('images/ic_thermometer.png'),
                                     fit: BoxFit.cover,
                                     width: MediaQuery.of(context).size.width *
-                                        0.10,
+                                        0.09,
                                     height: MediaQuery.of(context).size.width *
-                                        0.10,
+                                        0.09,
                                   ),
                                   Text(
                                       deviceList[index]
                                               .getTemperature()
-                                              .toString() +
+                                              .toStringAsFixed(2) +
                                           '°C',
                                       style: bigTextStyle),
                                 ],
@@ -479,12 +489,14 @@ class ScanscreenState extends State<Scanscreen> {
                                     image: AssetImage('images/ic_humidity.png'),
                                     fit: BoxFit.cover,
                                     width: MediaQuery.of(context).size.width *
-                                        0.09,
+                                        0.08,
                                     height: MediaQuery.of(context).size.width *
-                                        0.09,
+                                        0.08,
                                   ),
                                   Text(
-                                    deviceList[index].getHumidity().toString() +
+                                    deviceList[index]
+                                            .getHumidity()
+                                            .toStringAsFixed(2) +
                                         '%',
                                     style: bigTextStyle,
                                   )
@@ -575,7 +587,7 @@ class ScanscreenState extends State<Scanscreen> {
       //SCAN 시작
 
       _bleManager
-          .startPeripheralScan(scanMode: ScanMode.balanced)
+          .startPeripheralScan(scanMode: ScanMode.lowLatency)
           .listen((scanResult) {
         //listen 이벤트 형식으로 장치가 발견되면 해당 루틴을 계속 탐.
         //periphernal.name이 없으면 advertisementData.localName확인 이것도 없다면 unknown으로 표시
@@ -600,8 +612,7 @@ class ScanscreenState extends State<Scanscreen> {
               element.advertisementData = scanResult.advertisementData;
               element.rssi = scanResult.rssi;
             }
-            print("현재위치");
-            print(currentLocation.latitude.toString());
+
             if (currentLocation != null) {
               BleDeviceItem currentItem = new BleDeviceItem(
                   name,
@@ -620,7 +631,7 @@ class ScanscreenState extends State<Scanscreen> {
                 time: new DateTime.now().toString(),
                 lex: '',
               );
-              // getCurrentLocation();
+
               print(currentItem.getBattery().toString() +
                   ' ' +
                   currentItem.getTemperature().toString() +
@@ -851,12 +862,12 @@ class ScanscreenState extends State<Scanscreen> {
   }
 
   TextStyle lastUpdateTextStyle = TextStyle(
-    fontSize: 15,
+    fontSize: 14,
     color: Color.fromRGBO(5, 5, 5, 1),
     fontWeight: FontWeight.w300,
   );
   TextStyle updateTextStyle = TextStyle(
-    fontSize: 15,
+    fontSize: 14,
     color: Color.fromRGBO(0xe8, 0x52, 0x55, 1),
     fontWeight: FontWeight.w300,
   );
@@ -867,7 +878,7 @@ class ScanscreenState extends State<Scanscreen> {
   );
 
   TextStyle bigTextStyle = TextStyle(
-    fontSize: 33,
+    fontSize: 31,
     color: Color.fromRGBO(50, 50, 50, 1),
     fontWeight: FontWeight.w200,
   );
@@ -940,29 +951,29 @@ class ScanscreenState extends State<Scanscreen> {
       return Image(
         image: AssetImage('images/battery_100.png'),
         fit: BoxFit.contain,
-        width: MediaQuery.of(context).size.width * 0.1,
-        height: MediaQuery.of(context).size.width * 0.1,
+        width: MediaQuery.of(context).size.width * 0.08,
+        height: MediaQuery.of(context).size.width * 0.08,
       );
     } else if (battery >= 50) {
       return Image(
         image: AssetImage('images/battery_75.png'),
         fit: BoxFit.contain,
-        width: MediaQuery.of(context).size.width * 0.1,
-        height: MediaQuery.of(context).size.width * 0.1,
+        width: MediaQuery.of(context).size.width * 0.08,
+        height: MediaQuery.of(context).size.width * 0.08,
       );
     } else if (battery >= 35) {
       return Image(
         image: AssetImage('images/battery_50.png'),
         fit: BoxFit.contain,
-        width: MediaQuery.of(context).size.width * 0.05,
-        height: MediaQuery.of(context).size.width * 0.05,
+        width: MediaQuery.of(context).size.width * 0.08,
+        height: MediaQuery.of(context).size.width * 0.08,
       );
     } else if (battery >= 15)
       return Image(
         image: AssetImage('images/battery_25.png'),
         fit: BoxFit.contain,
-        width: MediaQuery.of(context).size.width * 0.1,
-        height: MediaQuery.of(context).size.width * 0.1,
+        width: MediaQuery.of(context).size.width * 0.08,
+        height: MediaQuery.of(context).size.width * 0.08,
       );
   }
 
@@ -1071,6 +1082,11 @@ class ScanscreenState extends State<Scanscreen> {
     print('lat: ' + _locationData.latitude.toString());
     setState(() {
       currentLocation = _locationData;
+    });
+    location.onLocationChanged.listen((loc.LocationData currentLocations) {
+      setState(() {
+        currentLocation = currentLocations;
+      });
     });
 
     init();

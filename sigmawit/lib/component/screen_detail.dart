@@ -142,6 +142,7 @@ class _DetailScreenState extends State<DetailScreen> {
         "de_number": data.deviceName,
         "tra_battery": data.battery,
       });
+      print(uriResponse.body);
 
       // print(await client.get(uriResponse.body['uri'].toString()));
     } catch (e) {

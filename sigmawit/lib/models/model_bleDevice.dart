@@ -1,3 +1,5 @@
+import 'dart:ffi';
+
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'dart:typed_data';
 import 'dart:convert';
@@ -16,17 +18,36 @@ class BleDeviceItem {
   BleDeviceItem(this.deviceName, this.rssi, this.peripheral,
       this.advertisementData, this.connectionState);
 
-  getTemperature() {
+  double getTemperature() {
     if (advertisementData.manufacturerData[0] == 57 &&
         advertisementData.manufacturerData[1] == 6) {
       int tmp = ByteData.sublistView(
               this.advertisementData.manufacturerData.sublist(5, 6))
           .getUint8(0);
+      if (tmp > 128) {
+        int test = tmp ^ 255;
+
+        tmp = test * -1;
+      }
+
       int tmp2 = ByteData.sublistView(
               this.advertisementData.manufacturerData.sublist(6, 7))
           .getUint8(0);
-      if (tmp2 > 61) tmp2 = tmp2 - 61;
-      double result = tmp + tmp2 / 100;
+
+      if (tmp > 128) tmp = (tmp - 128) * -1;
+      // 0010 0001
+      // 0001
+
+      int tmp2_1 = tmp2 | 15;
+      tmp2_1 = (tmp2_1 ^ 15) >> 4;
+      double result2 = (tmp2_1 / 16);
+
+      int tmp2_2 = tmp2 | 240;
+      tmp2_2 = tmp2_2 ^ 240;
+      double result2_2 = tmp2_1 / 16 / 16;
+      double results = result2 + result2_2;
+      double result = tmp + results;
+
       // print(tmp);
       lastUpdateTime = DateTime.now();
       return result;
@@ -40,7 +61,7 @@ class BleDeviceItem {
     }
   }
 
-  getHumidity() {
+  double getHumidity() {
     if (advertisementData.manufacturerData[0] == 57 &&
         advertisementData.manufacturerData[1] == 6) {
       int tmp = ByteData.sublistView(
@@ -49,8 +70,19 @@ class BleDeviceItem {
       int tmp2 = ByteData.sublistView(
               this.advertisementData.manufacturerData.sublist(8, 9))
           .getUint8(0);
-      if (tmp2 > 61) tmp2 = tmp2 - 61;
-      double result = tmp + tmp2 / 100;
+      if (tmp > 128) tmp = (tmp - 128) * -1;
+
+      int tmp2_1 = tmp2 | 15;
+      tmp2_1 = (tmp2_1 ^ 15) >> 4;
+      double result2 = (tmp2_1 / 16);
+
+      int tmp2_2 = tmp2 | 240;
+      tmp2_2 = tmp2_2 ^ 240;
+      double result2_2 = tmp2_1 / 16 / 16;
+      double results = result2 + result2_2;
+      double result = tmp + results;
+      // if (tmp2 > 61) tmp2 = tmp2 - 61;
+      // double result = tmp + (tmp2 / 100);
       // print(tmp);
       lastUpdateTime = DateTime.now();
       return result;
