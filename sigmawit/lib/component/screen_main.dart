@@ -898,7 +898,7 @@ class ScanscreenState extends State<Scanscreen> {
               Text(
                 'OPTILO',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontWeight: FontWeight.w500),
+                style: TextStyle(fontWeight: FontWeight.w600),
               ),
             ],
           )),
