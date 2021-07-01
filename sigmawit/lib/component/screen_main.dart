@@ -882,7 +882,7 @@ class ScanscreenState extends State<Scanscreen> {
   Widget build(BuildContext context) {
     return MaterialApp(
         debugShowCheckedModeBanner: false,
-        title: 'OPTILO',
+        title: 'OPTILO2',
         theme: ThemeData(
           // primarySwatch: Colors.grey,
           primaryColor: Color.fromRGBO(0x61, 0xB2, 0xD0, 1),
