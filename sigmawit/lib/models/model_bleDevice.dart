@@ -41,6 +41,9 @@ class BleDeviceItem {
   }
 
   getDeviceId() {
+    if (this.deviceName != 'T301') {
+      return this.deviceName;
+    }
     String tmp = ByteData.sublistView(
             this.advertisementData.manufacturerData.sublist(7, 9))
         .getUint16(0)

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'dart:io';
@@ -13,6 +14,7 @@ import 'package:location/location.dart' as loc;
 import 'package:geocoder/geocoder.dart';
 import 'package:intl/intl.dart';
 import '../component/screen_camera.dart';
+import '../component/screen_edit.dart';
 import 'package:camera/camera.dart';
 
 class Scanscreen extends StatefulWidget {
@@ -36,7 +38,6 @@ class ScanscreenState extends State<Scanscreen> {
   int processState = 1;
   StreamSubscription<loc.LocationData> _locationSubscription;
   StreamSubscription monitoringStreamSubscription;
-
   String _error;
   String geolocation;
   String currentDeviceName = '';
@@ -58,7 +59,6 @@ class ScanscreenState extends State<Scanscreen> {
     currentDeviceName = '';
     currentTemp = '-';
     currentHumi = '-';
-
     init();
   }
 
@@ -144,7 +144,7 @@ class ScanscreenState extends State<Scanscreen> {
     }
   }
 
-  Future<void> monitorCharacteristic(Peripheral peripheral) async {
+  Future<void> monitorCharacteristic(Peripheral peripheral, flag) async {
     await _runWithErrorHandling(() async {
       Service service = await peripheral.services().then((services) =>
           services.firstWhere((service) =>
@@ -156,7 +156,7 @@ class ScanscreenState extends State<Scanscreen> {
               characteristic.uuid == '00001002-0000-1000-8000-00805f9b34fb');
 
       _startMonitoringTemperature(
-          characteristic.monitor(transactionId: "monitor"), peripheral);
+          characteristic.monitor(transactionId: "monitor"), peripheral, flag);
     });
   }
 
@@ -168,8 +168,8 @@ class ScanscreenState extends State<Scanscreen> {
     monitoringStreamSubscription?.cancel();
   }
 
-  void _startMonitoringTemperature(
-      Stream<Uint8List> characteristicUpdates, Peripheral peripheral) async {
+  void _startMonitoringTemperature(Stream<Uint8List> characteristicUpdates,
+      Peripheral peripheral, flag) async {
     monitoringStreamSubscription?.cancel();
 
     monitoringStreamSubscription = characteristicUpdates.listen(
@@ -188,13 +188,21 @@ class ScanscreenState extends State<Scanscreen> {
             Uint8List minmaxStamp = getMinMaxTimestamp(notifyResult);
             print('여기 걸리나 ?');
             await _stopMonitoringTemperature();
-
-            Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => DetailScreen(
-                        currentDevice: deviceList[index],
-                        minmaxStamp: minmaxStamp)));
+            if (flag == 0) {
+              Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => DetailScreen(
+                          currentDevice: deviceList[index],
+                          minmaxStamp: minmaxStamp)));
+            } else {
+              Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => EditScreen(
+                            currentDevice: deviceList[index],
+                          )));
+            }
           }
         }
       },
@@ -205,8 +213,9 @@ class ScanscreenState extends State<Scanscreen> {
     );
   }
 
-  void startRoutine(int index) async {
-    // await monitorCharacteristic(deviceList[index].peripheral);
+  void startRoutine(int index, flag) async {
+    // 여기 !
+    await monitorCharacteristic(deviceList[index].peripheral, flag);
     String unixTimestamp =
         (DateTime.now().toUtc().millisecondsSinceEpoch / 1000)
             .toInt()
@@ -346,21 +355,28 @@ class ScanscreenState extends State<Scanscreen> {
       padding: const EdgeInsets.all(8),
       itemCount: deviceList.length,
       itemBuilder: (BuildContext context, int index) {
-        return InkWell(
-            onTap: () async {
-              await connect(index);
-              // await startRoutine(index);
-            },
-            child: Container(
-              decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [customeBoxShadow()],
-                  borderRadius: BorderRadius.all(Radius.circular(5))),
-              height: MediaQuery.of(context).size.height * 0.3,
-              width: MediaQuery.of(context).size.width * 0.99,
-              child: Column(children: [
-                Expanded(
-                  flex: 4,
+        return Container(
+          decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [customeBoxShadow()],
+              borderRadius: BorderRadius.all(Radius.circular(5))),
+          height: MediaQuery.of(context).size.height * 0.3,
+          width: MediaQuery.of(context).size.width * 0.99,
+          child: Column(children: [
+            Expanded(
+                flex: 4,
+                child: InkWell(
+                  onTap: () async {
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => EditScreen(
+                                  currentDevice: deviceList[index],
+                                )));
+
+                    // 여기 2
+                    // await startRoutine(index);
+                  },
                   child: Container(
                       padding: EdgeInsets.only(top: 5, left: 2),
                       width: MediaQuery.of(context).size.width * 0.98,
@@ -440,109 +456,123 @@ class ScanscreenState extends State<Scanscreen> {
                           )
                         ],
                       )),
-                ),
-                Expanded(
-                    flex: 3,
-                    child: Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              SizedBox(),
-                            ],
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              Row(
+                )),
+            Expanded(
+              flex: 3,
+              child: InkWell(
+                  onTap: () async {
+                    await connect(index, 0);
+                    // 여기 2
+                    // await startRoutine(index);
+                  },
+
+                  // onTap: Navigator.push(
+                  //     context,
+                  //     MaterialPageRoute(
+                  //         builder: (context) => DetailScreen()(
+                  //               camera: firstCamera,
+                  //             ))),
+                  child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            SizedBox(),
+                          ],
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            Row(
+                              children: [
+                                Image(
+                                  image:
+                                      AssetImage('images/ic_thermometer.png'),
+                                  fit: BoxFit.cover,
+                                  width:
+                                      MediaQuery.of(context).size.width * 0.10,
+                                  height:
+                                      MediaQuery.of(context).size.width * 0.10,
+                                ),
+                                Text(
+                                    deviceList[index]
+                                            .getTemperature()
+                                            .toString() +
+                                        '°C',
+                                    style: bigTextStyle),
+                              ],
+                            ),
+                            Row(
+                              children: [
+                                Image(
+                                  image: AssetImage('images/ic_humidity.png'),
+                                  fit: BoxFit.cover,
+                                  width:
+                                      MediaQuery.of(context).size.width * 0.09,
+                                  height:
+                                      MediaQuery.of(context).size.width * 0.09,
+                                ),
+                                Text(
+                                  deviceList[index].getHumidity().toString() +
+                                      '%',
+                                  style: bigTextStyle,
+                                )
+                              ],
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Image(
-                                    image:
-                                        AssetImage('images/ic_thermometer.png'),
-                                    fit: BoxFit.cover,
-                                    width: MediaQuery.of(context).size.width *
-                                        0.10,
-                                    height: MediaQuery.of(context).size.width *
-                                        0.10,
-                                  ),
-                                  Text(
-                                      deviceList[index]
-                                              .getTemperature()
-                                              .toString() +
-                                          '°C',
-                                      style: bigTextStyle),
-                                ],
-                              ),
-                              Row(
-                                children: [
-                                  Image(
-                                    image: AssetImage('images/ic_humidity.png'),
-                                    fit: BoxFit.cover,
-                                    width: MediaQuery.of(context).size.width *
-                                        0.09,
-                                    height: MediaQuery.of(context).size.width *
-                                        0.09,
-                                  ),
-                                  Text(
-                                    deviceList[index].getHumidity().toString() +
-                                        '%',
-                                    style: bigTextStyle,
+                                  Row(
+                                    children: [
+                                      getbatteryImage(
+                                          deviceList[index].getBattery()),
+                                      Text(
+                                        '  ' +
+                                            deviceList[index]
+                                                .getBattery()
+                                                .toString() +
+                                            '%',
+                                        style: lastUpdateTextStyle,
+                                      ),
+                                    ],
                                   )
                                 ],
                               ),
-                            ],
-                          ),
-                          Row(
-                            children: [
-                              Expanded(
-                                flex: 3,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        getbatteryImage(
-                                            deviceList[index].getBattery()),
-                                        Text(
-                                          '  ' +
-                                              deviceList[index]
-                                                  .getBattery()
-                                                  .toString() +
-                                              '%',
-                                          style: lastUpdateTextStyle,
+                            ),
+                            Expanded(
+                              flex: 8,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Text('Last updated  ',
+                                      style: lastUpdateTextStyle),
+                                  deviceList[index].lastUpdateTime != null
+                                      ? Text(
+                                          DateFormat('yyyy-MM-dd - HH:mm')
+                                              .format(deviceList[index]
+                                                  .lastUpdateTime),
+                                          style: updateTextStyle,
+                                        )
+                                      : Text(
+                                          '-',
+                                          style: updateTextStyle,
                                         ),
-                                      ],
-                                    )
-                                  ],
-                                ),
+                                  Text('  ')
+                                ],
                               ),
-                              Expanded(
-                                flex: 8,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    Text('Last updated  ',
-                                        style: lastUpdateTextStyle),
-                                    deviceList[index].lastUpdateTime != null
-                                        ? Text(
-                                            DateFormat('yyyy-MM-dd - HH:mm')
-                                                .format(deviceList[index]
-                                                    .lastUpdateTime),
-                                            style: updateTextStyle,
-                                          )
-                                        : Text(
-                                            '-',
-                                            style: updateTextStyle,
-                                          ),
-                                    Text('  ')
-                                  ],
-                                ),
-                              ),
-                            ],
-                          )
-                        ]))
-              ]),
-            ));
+                            ),
+                          ],
+                        )
+                      ])),
+            )
+          ]),
+        );
       },
       //12,13 온도
       separatorBuilder: (BuildContext context, int index) {
@@ -692,7 +722,7 @@ class ScanscreenState extends State<Scanscreen> {
   }
 
   //연결 함수
-  connect(index) async {
+  connect(index, flag) async {
     if (_connected) {
       //이미 연결상태면 연결 해제후 종료
       await _curPeripheral?.disconnectOrCancelConnection();
@@ -811,7 +841,7 @@ class ScanscreenState extends State<Scanscreen> {
             }
           }
           //모든 과정이 마무리되면 연결되었다고 표시
-          startRoutine(index);
+          startRoutine(index, flag);
           _connected = true;
           _isScanning = true;
           setState(() {});
