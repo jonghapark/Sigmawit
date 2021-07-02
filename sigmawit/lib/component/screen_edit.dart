@@ -99,9 +99,12 @@ class _EditScreenState extends State<EditScreen> {
                   setState(() {
                     codeDialog = valueText;
                   });
-                  // if(valueText.length > 6
-                  if (valueText.substring(0, 7) == 'Sensor_') {
-                    await DBHelper().createData(DeviceInfo(
+
+                  var temp = await DBHelper()
+                      .getDevice(selectedDevice.peripheral.identifier);
+
+                  if (temp == Null) {
+                    await DBHelper().createData(new DeviceInfo(
                         deviceName: codeDialog,
                         isDesiredConditionOn: 'false',
                         macAddress: selectedDevice.peripheral.identifier,
@@ -109,10 +112,13 @@ class _EditScreenState extends State<EditScreen> {
                         maxTemper: 8,
                         minHumidity: 2,
                         maxHumidity: 8));
+                    print('createData');
+                    Navigator.pop(context);
                   } else {
                     await DBHelper().updateDeviceName(
                         selectedDevice.peripheral.identifier, codeDialog);
                     selectedDevice.deviceName = codeDialog;
+                    print('updateData');
                     Navigator.pop(context);
                   }
                 },

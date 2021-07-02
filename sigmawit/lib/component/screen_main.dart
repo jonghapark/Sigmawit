@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter_ble_lib/flutter_ble_lib.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sigmawit/component/screen_detail.dart';
+import 'package:sigmawit/models/model_logdata.dart';
 import '../models/model_bleDevice.dart';
 import '../utils/util.dart';
 import 'dart:typed_data';
@@ -44,6 +45,8 @@ class ScanscreenState extends State<Scanscreen> {
   Timer _timer;
   int _start = 0;
   bool isStart = false;
+  Future<List<DeviceInfo>> savedList;
+  Map<String, String> idMapper;
   // double width;
 
   String firstImagePath = '';
@@ -56,6 +59,7 @@ class ScanscreenState extends State<Scanscreen> {
   void initState() {
     super.initState();
     // getCurrentLocation();
+    savedList = DBHelper().getAllDevices();
     currentDeviceName = '';
     currentTemp = '-';
     currentHumi = '-';
@@ -399,10 +403,41 @@ class ScanscreenState extends State<Scanscreen> {
                                     MediaQuery.of(context).size.width * 0.10,
                               ),
                               Text(' '),
-                              Text(
-                                deviceList[index].getDeviceId(),
-                                style: whiteTextStyle,
-                              ),
+                              FutureBuilder(
+                                  future: DBHelper().getAllDevices(),
+                                  builder: (BuildContext context,
+                                      AsyncSnapshot<List<DeviceInfo>>
+                                          snapshot) {
+                                    if (snapshot.hasData) {
+                                      List<DeviceInfo> devices = snapshot.data;
+                                      String temp = '';
+                                      for (int i = 0; i < devices.length; i++) {
+                                        if (devices[i].macAddress ==
+                                            deviceList[index]
+                                                .peripheral
+                                                .identifier) {
+                                          temp = devices[i].deviceName;
+                                          break;
+                                        }
+                                      }
+                                      if (temp == '') {
+                                        return Text(
+                                          deviceList[index].getDeviceId(),
+                                          style: whiteTextStyle,
+                                        );
+                                      } else {
+                                        return Text(
+                                          temp,
+                                          style: whiteTextStyle,
+                                        );
+                                      }
+                                    } else {
+                                      return Text(
+                                        deviceList[index].getDeviceId(),
+                                        style: whiteTextStyle,
+                                      );
+                                    }
+                                  })
                             ],
                           ),
                           Row(
@@ -656,18 +691,19 @@ class ScanscreenState extends State<Scanscreen> {
           if (name != "Unknowns") {
             // print(name);
             // if (name.substring(0, 3) == 'IOT') {
-            if (name.substring(0, 4) == 'T301') {
-              BleDeviceItem currentItem = new BleDeviceItem(
-                  name,
-                  scanResult.rssi,
-                  scanResult.peripheral,
-                  scanResult.advertisementData,
-                  'scan');
-              deviceList.add(currentItem);
-
-              //print(scanResult.advertisementData.manufacturerData.toString());
-              // print(scanResult.peripheral.name +
-              //     "의 advertiseData  \n"
+            if (name != null) {
+              if (name.substring(0, 4) == 'T301') {
+                BleDeviceItem currentItem = new BleDeviceItem(
+                    name,
+                    scanResult.rssi,
+                    scanResult.peripheral,
+                    scanResult.advertisementData,
+                    'scan');
+                deviceList.add(currentItem);
+                //print(scanResult.advertisementData.manufacturerData.toString());
+                // print(scanResult.peripheral.name +
+                //     "의 advertiseData  \n"
+              }
             }
             // else if (scanResult.peripheral.identifier.substring(0, 8) ==
             //     'AC:23:3F') {

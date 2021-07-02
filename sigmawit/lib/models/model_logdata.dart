@@ -70,7 +70,7 @@ class DBHelper {
   createData(DeviceInfo device) async {
     final db = await database;
     var res = await db.rawInsert(
-        'INSERT INTO $TableName(name, mac, conditionflag, minTemp, maxTemp, minHumi , maxHumi) VALUES(?)',
+        'INSERT INTO $TableName(name, mac, conditionflag, minTemp, maxTemp, minHumi , maxHumi) VALUES(?,?,?,?,?,?,?)',
         [device.deviceName, device.macAddress, 'false', 0, 0, 0, 0]);
     return res;
   }
