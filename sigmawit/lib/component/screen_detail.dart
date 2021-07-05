@@ -22,6 +22,7 @@ import 'package:pdf/pdf.dart';
 import 'dart:io';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:screenshot/screenshot.dart';
+import 'package:esys_flutter_share/esys_flutter_share.dart';
 
 class DetailScreen extends StatefulWidget {
   final BleDeviceItem currentDevice;
@@ -46,6 +47,8 @@ class _DetailScreenState extends State<DetailScreen> {
   int count = 0;
   double min = 100;
   double max = -100;
+  DateTime minTime;
+  DateTime maxTime;
   // String result = '';
 
   String log = '데이터 가져오는 중';
@@ -64,8 +67,13 @@ class _DetailScreenState extends State<DetailScreen> {
     fetchLogData();
   }
 
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
   void takeScreenshot() async {
-    screenshotController.capture().then((Uint8List image) {
+    await screenshotController.capture().then((Uint8List image) {
       //Capture Done
       _imageFile = image;
     }).catchError((onError) {
@@ -76,7 +84,7 @@ class _DetailScreenState extends State<DetailScreen> {
   List<pw.Text> allText() {
     List<pw.Text> result = [];
     for (int i = 0; i < filteredDatas.length; i++) {
-      if (i > 9) {
+      if (i > 8) {
         result.add(pw.Text((i + 1).toString() +
             '. ' +
             filteredDatas[i].temperature.toString() +
@@ -114,10 +122,8 @@ class _DetailScreenState extends State<DetailScreen> {
     final directory = await getExternalStorageDirectory();
     final path = directory.path;
     var filePath = path;
-    print('과연');
-    // print(allText());
     pdf = pw.Document();
-    pdf.addPage(
+    await pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
         build: (pw.Context context) {
@@ -140,9 +146,16 @@ class _DetailScreenState extends State<DetailScreen> {
         },
       ),
     );
-    File pdfFile = File(filePath + '/test.pdf');
+    String now = DateTime.now().toString();
+    File pdfFile = File(filePath + '/report_' + now + '.pdf');
     pdfFile.writeAsBytesSync(await pdf.save());
     print('pdf 저장완료');
+
+    await Share.file('의약품 운송 결과', '/report_' + now + '.pdf',
+            await pdfFile.readAsBytes(), 'application/pdf',
+            text: '결과 보고서 파일입니다.')
+        .then((value) => print('pdf 공유완료'))
+        .onError((error, stackTrace) => print(error));
   }
 
   getCurrentLocation() async {
@@ -351,8 +364,21 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   fetchLogData() async {
+    minTime = await File(widget.currentDevice.firstPath).lastModified();
+    maxTime = await File(widget.currentDevice.secondPath).lastModified();
+    print('날짜는요?');
+    print(minTime.toString());
+    print(maxTime.toString());
     await monitorCharacteristic(widget.currentDevice.peripheral);
     print('Write Start');
+    print(widget.minmaxStamp.toString());
+    // int tmp =
+    //     ByteData.sublistView(widget.minmaxStamp.sublist(0, 3)).getInt32(0);
+    // print(tmp);
+    // int now = DateTime.now().millisecondsSinceEpoch;
+
+    // print(DateTime.now().microsecondsSinceEpoch.toString());
+
     var writeCharacteristics = await widget.currentDevice.peripheral
         .writeCharacteristic(
             '00001000-0000-1000-8000-00805f9b34fb',
@@ -369,13 +395,15 @@ class _DetailScreenState extends State<DetailScreen> {
     await monitoringStreamSubscription?.cancel();
     monitoringStreamSubscription = characteristicUpdates.listen(
       (notifyResult) async {
-        print(notifyResult.toString());
+        // print(notifyResult.toString());
         if (notifyResult[10] == 0x05) {
           //TODO: 데이터 읽어오기
-          if (count % 9 == 0) {
-            fetchDatas.add(transformData(notifyResult));
+          LogData temp = transformData(notifyResult);
+          if (temp.timestamp.isAfter(minTime) &&
+              temp.timestamp.isBefore(maxTime)) {
+            fetchDatas.add(temp);
+            count++;
           }
-          count++;
         }
         // DataFetch End
         else if (notifyResult[10] == 0x06) {
@@ -405,10 +433,11 @@ class _DetailScreenState extends State<DetailScreen> {
           });
         }
       },
-      onError: (error) {
+      onError: (error) async {
         print("Error while monitoring characteristic \n$error");
         if (dataFetchEnd == false) {
-          showMyDialog(context);
+          await showMyDialog(context);
+          Navigator.of(context).pop();
         }
       },
       cancelOnError: true,
@@ -459,6 +488,12 @@ class _DetailScreenState extends State<DetailScreen> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+        builder: (context, child) {
+          return MediaQuery(
+            child: child,
+            data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
+          );
+        },
         debugShowCheckedModeBanner: false,
         title: 'OPTILO',
         theme: ThemeData(
@@ -474,24 +509,27 @@ class _DetailScreenState extends State<DetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(
-                      flex: 9,
+                      flex: 8,
                       child: Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             Text(
-                              'OPTILO',
+                              'Thermo Cert',
                               textAlign: TextAlign.center,
-                              style: TextStyle(fontWeight: FontWeight.w300),
+                              style: TextStyle(
+                                  fontSize:
+                                      MediaQuery.of(context).size.width / 18,
+                                  fontWeight: FontWeight.w600),
                             ),
                           ]),
                     ),
                     Expanded(
-                        flex: 7,
+                        flex: 4,
                         child: Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
                               new IconButton(
-                                icon: new Icon(Icons.file_upload, size: 25),
+                                icon: new Icon(Icons.share, size: 30),
                                 onPressed: () async {
                                   await takeScreenshot();
                                   // showUploadDialog(
@@ -517,8 +555,9 @@ class _DetailScreenState extends State<DetailScreen> {
             ),
             body: Screenshot(
                 controller: screenshotController,
-                child: Center(
+                child: Container(
                     child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     // DefaultTabController(
                     //     length: 5,
@@ -578,13 +617,19 @@ class _DetailScreenState extends State<DetailScreen> {
                     //             .substring(0, 19))
                     //     : Text(''),
                     Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         dataFetchEnd == false
-                            ? Container(
+                            ? Center(
+                                // height:
+                                //     MediaQuery.of(context).size.height * 0.85,
+                                child: Container(
+                                padding: EdgeInsets.all(4),
                                 height:
-                                    MediaQuery.of(context).size.height * 0.7,
+                                    MediaQuery.of(context).size.height * 0.85,
                                 child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Text(
@@ -597,11 +642,12 @@ class _DetailScreenState extends State<DetailScreen> {
                                               backgroundColor: Colors.black26,
                                             )
                                           : SizedBox(),
-                                    ]))
+                                    ]),
+                              ))
                             : Container(
-                                padding: EdgeInsets.all(8),
+                                padding: EdgeInsets.all(4),
                                 height:
-                                    MediaQuery.of(context).size.height * 0.75,
+                                    MediaQuery.of(context).size.height * 0.85,
                                 child: Column(
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceEvenly,
@@ -615,8 +661,16 @@ class _DetailScreenState extends State<DetailScreen> {
                                               CrossAxisAlignment.start,
                                           children: [
                                             Text('디바이스 명 : ' +
-                                                widget
-                                                    .currentDevice.deviceName),
+                                                'Sensor_' +
+                                                widget.currentDevice.peripheral
+                                                    .identifier
+                                                    .substring(9, 11) +
+                                                widget.currentDevice.peripheral
+                                                    .identifier
+                                                    .substring(12, 14) +
+                                                widget.currentDevice.peripheral
+                                                    .identifier
+                                                    .substring(15, 17)),
                                             Text('Mac Address : ' +
                                                 widget.currentDevice.peripheral
                                                     .identifier),
@@ -624,7 +678,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                         ),
                                         Image(
                                           image: AssetImage(
-                                              'images/background.jpeg'),
+                                              'images/background2.png'),
                                           fit: BoxFit.contain,
                                           width: MediaQuery.of(context)
                                                   .size
@@ -637,105 +691,120 @@ class _DetailScreenState extends State<DetailScreen> {
                                         ),
                                       ],
                                     ),
-
-                                    SfCartesianChart(
-                                        primaryXAxis: DateTimeAxis(
-                                            labelRotation: 5,
-                                            maximumLabels: 5,
-                                            // Set name for x axis in order to use it in the callback event.
-                                            name: 'primaryXAxis',
-                                            intervalType: currentType,
-                                            majorGridLines:
-                                                MajorGridLines(width: 1)),
-                                        // primaryYAxis:
-                                        //     NumericAxis(interval: 1, maximum: 30),
-                                        // Chart title
-                                        title: ChartTitle(text: '온도 그래프'),
-                                        // Enable legend
-                                        legend: Legend(isVisible: false),
-                                        // Enable tooltip
-                                        tooltipBehavior:
-                                            TooltipBehavior(enable: true),
-                                        series: <
-                                            ChartSeries<LogData, DateTime>>[
-                                          LineSeries<LogData, DateTime>(
-                                              dataSource: filteredDatas,
-                                              xValueMapper: (LogData data, _) {
-                                                return data.timestamp;
-                                              },
-                                              yValueMapper: (LogData data, _) =>
-                                                  data.temperature,
-                                              name: '온도',
-                                              // Enable data label
-                                              dataLabelSettings:
-                                                  DataLabelSettings(
-                                                      isVisible: false))
-                                        ]),
-                                    Text('최저 온도 : ' +
-                                        min.toString() +
-                                        '°C    / ' +
-                                        '최고 온도 : ' +
-                                        max.toString() +
-                                        '°C\n'),
-                                    Text('시작 / 종료 이미지'),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceAround,
+                                    Column(
                                       children: [
-                                        Image.file(
-                                          File(widget.currentDevice.firstPath),
-                                          width: MediaQuery.of(context)
-                                                  .size
-                                                  .width *
-                                              0.4,
-                                          height: MediaQuery.of(context)
-                                                  .size
-                                                  .width *
-                                              0.5,
-                                          fit: BoxFit.contain,
-                                        ),
-                                        Image.file(
-                                            File(widget
-                                                .currentDevice.secondPath),
-                                            width: MediaQuery.of(context)
-                                                    .size
-                                                    .width *
-                                                0.4,
-                                            height: MediaQuery.of(context)
-                                                    .size
-                                                    .width *
-                                                0.5)
+                                        SfCartesianChart(
+                                            primaryYAxis: NumericAxis(
+                                                interval: 10,
+                                                minimum: 0,
+                                                plotBands: <PlotBand>[
+                                                  PlotBand(
+                                                    text: '적정 온도(2°C ~ 8°C)',
+                                                    textStyle: TextStyle(
+                                                        color: Color.fromRGBO(
+                                                            0, 0, 0, 0.6),
+                                                        fontSize: 12,
+                                                        fontWeight:
+                                                            FontWeight.bold),
+                                                    isVisible: true,
+                                                    start: 2,
+                                                    end: 8,
+                                                    borderWidth: 2,
+                                                    color: Color.fromRGBO(
+                                                        255, 255, 255, 1.0),
+                                                    borderColor: Colors.red,
+                                                  )
+                                                ]),
+                                            primaryXAxis: DateTimeAxis(
+                                                labelRotation: 5,
+                                                maximumLabels: 5,
+                                                // Set name for x axis in order to use it in the callback event.
+                                                name: 'primaryXAxis',
+                                                intervalType: currentType,
+                                                majorGridLines:
+                                                    MajorGridLines(width: 1)),
+                                            // primaryYAxis:
+                                            //     NumericAxis(interval: 1, maximum: 30),
+                                            // Chart title
+                                            title: ChartTitle(text: '온도 그래프'),
+                                            // Enable legend
+                                            legend: Legend(isVisible: false),
+                                            // Enable tooltip
+                                            tooltipBehavior:
+                                                TooltipBehavior(enable: true),
+                                            series: <
+                                                ChartSeries<LogData, DateTime>>[
+                                              LineSeries<LogData, DateTime>(
+                                                  dataSource: filteredDatas,
+                                                  xValueMapper:
+                                                      (LogData data, _) {
+                                                    return data.timestamp;
+                                                  },
+                                                  yValueMapper:
+                                                      (LogData data, _) =>
+                                                          data.temperature,
+                                                  name: '온도',
+                                                  // Enable data label
+                                                  dataLabelSettings:
+                                                      DataLabelSettings(
+                                                          isVisible: false))
+                                            ]),
+                                        Text('최저 온도 : ' +
+                                            min.toString() +
+                                            '°C    / ' +
+                                            '최고 온도 : ' +
+                                            max.toString() +
+                                            '°C\n'),
+                                        Text('시작 시간 : ' +
+                                            DateFormat('yyyy-MM-dd HH:mm:ss')
+                                                .format(minTime)),
+                                        Text('종료 시간 : ' +
+                                            DateFormat('yyyy-MM-dd HH:mm:ss')
+                                                .format(maxTime)),
+                                        Text('총 데이터 (1분 단위) : ' +
+                                            count.toString() +
+                                            '개'),
                                       ],
                                     ),
-                                    // SfCartesianChart(
-                                    //     primaryXAxis: DateTimeAxis(
-                                    //         labelRotation: 5,
-                                    //         maximumLabels: 5,
-                                    //         // Set name for x axis in order to use it in the callback event.
-                                    //         name: 'primaryXAxis',
-                                    //         intervalType: currentType,
-                                    //         majorGridLines:
-                                    //             MajorGridLines(width: 0.5)),
-                                    //     // Chart title
-                                    //     title: ChartTitle(text: '습도 그래프'),
-                                    //     // Enable legend
-                                    //     legend: Legend(isVisible: false),
-                                    //     // Enable tooltip
-                                    //     tooltipBehavior:
-                                    //         TooltipBehavior(enable: true),
-                                    //     series: <ChartSeries<LogData, DateTime>>[
-                                    //       LineSeries<LogData, DateTime>(
-                                    //           dataSource: filteredDatas,
-                                    //           xValueMapper: (LogData data, _) {
-                                    //             return data.timestamp;
-                                    //           },
-                                    //           yValueMapper: (LogData data, _) =>
-                                    //               data.humidity,
-                                    //           name: '습도',
-                                    //           // Enable data label
-                                    //           dataLabelSettings: DataLabelSettings(
-                                    //               isVisible: false))
-                                    //     ]),
+                                    Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceEvenly,
+                                      children: [
+                                        Text(
+                                          '[ 거래 명세서 ]\n',
+                                        ),
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceAround,
+                                          children: [
+                                            Image.file(
+                                              File(widget
+                                                  .currentDevice.firstPath),
+                                              // width: MediaQuery.of(context)
+                                              //         .size
+                                              //         .width *
+                                              //     0.35,
+                                              height: MediaQuery.of(context)
+                                                      .size
+                                                      .height *
+                                                  0.3,
+                                              fit: BoxFit.contain,
+                                            ),
+                                            Image.file(
+                                                File(widget
+                                                    .currentDevice.secondPath),
+                                                // width: MediaQuery.of(context)
+                                                //         .size
+                                                //         .width *
+                                                //     0.35,
+                                                height: MediaQuery.of(context)
+                                                        .size
+                                                        .height *
+                                                    0.3)
+                                          ],
+                                        ),
+                                      ],
+                                    )
                                   ],
                                 ))
                       ],
@@ -746,9 +815,9 @@ class _DetailScreenState extends State<DetailScreen> {
 }
 
 TextStyle thinTextStyle = TextStyle(
-  fontSize: 20,
+  fontSize: 24,
   color: Color.fromRGBO(20, 20, 20, 1),
-  fontWeight: FontWeight.w200,
+  fontWeight: FontWeight.w500,
 );
 
 showMyDialog(BuildContext context) {

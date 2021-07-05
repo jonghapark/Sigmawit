@@ -86,7 +86,7 @@ class _EditScreenState extends State<EditScreen> {
             ),
             actions: <Widget>[
               TextButton(
-                child: Text('CANCEL'),
+                child: Text('취소'),
                 onPressed: () {
                   setState(() {
                     Navigator.pop(context);
@@ -94,7 +94,7 @@ class _EditScreenState extends State<EditScreen> {
                 },
               ),
               TextButton(
-                child: Text('OK'),
+                child: Text('저장'),
                 onPressed: () async {
                   setState(() {
                     codeDialog = valueText;
@@ -105,14 +105,18 @@ class _EditScreenState extends State<EditScreen> {
 
                   if (temp == Null) {
                     await DBHelper().createData(new DeviceInfo(
-                        deviceName: codeDialog,
-                        isDesiredConditionOn: 'false',
-                        macAddress: selectedDevice.peripheral.identifier,
-                        minTemper: 2,
-                        maxTemper: 8,
-                        minHumidity: 2,
-                        maxHumidity: 8));
+                      deviceName: codeDialog,
+                      isDesiredConditionOn: 'false',
+                      macAddress: selectedDevice.peripheral.identifier,
+                      minTemper: 2,
+                      maxTemper: 8,
+                      minHumidity: 2,
+                      maxHumidity: 8,
+                      firstPath: '',
+                      secondPath: '',
+                    ));
                     print('createData');
+
                     Navigator.pop(context);
                   } else {
                     await DBHelper().updateDeviceName(
@@ -128,90 +132,16 @@ class _EditScreenState extends State<EditScreen> {
         });
   }
 
-  Future<void> _displayConditionInputDialog(BuildContext context) async {
-    bool tempTemp = false;
-    bool tempHumi = false;
-
+  Future<String> deleteDeviceDialog(BuildContext context) async {
     return showDialog(
         context: context,
         builder: (context) {
           return AlertDialog(
-            title: Text('Desired Conditions'),
-            content: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                SizedBox(height: 16),
-                Text('Min Temp (°C)',
-                    style: Theme.of(context).textTheme.headline6),
-                NumberPicker(
-                  axis: Axis.horizontal,
-                  value: _minTemp,
-                  minValue: 2,
-                  maxValue: 8,
-                  step: 1,
-                  haptics: true,
-                  onChanged: (value) => setState(() => _minTemp = value),
-                ),
-                Text('Max Temp (°C)',
-                    style: Theme.of(context).textTheme.headline6),
-                NumberPicker(
-                  axis: Axis.horizontal,
-                  value: _maxTemp,
-                  minValue: 2,
-                  maxValue: 8,
-                  step: 1,
-                  haptics: true,
-                  onChanged: (value) => setState(() => _maxTemp = value),
-                ),
-                Switch(
-                  value: isSwitchedTemp,
-                  onChanged: (value) {
-                    setState(() {
-                      tempTemp = value;
-                    });
-                  },
-                  activeTrackColor: Colors.lightBlueAccent,
-                  activeColor: Colors.blue,
-                ),
-                Divider(color: Colors.grey, height: 32),
-                SizedBox(height: 16),
-                Text('Min Humi (%)',
-                    style: Theme.of(context).textTheme.headline6),
-                NumberPicker(
-                  axis: Axis.horizontal,
-                  value: _minHumi,
-                  minValue: 2,
-                  maxValue: 8,
-                  step: 1,
-                  haptics: true,
-                  onChanged: (value) => setState(() => _minHumi = value),
-                ),
-                Text('Max Humi (%)',
-                    style: Theme.of(context).textTheme.headline6),
-                NumberPicker(
-                  axis: Axis.horizontal,
-                  value: _maxHumi,
-                  minValue: 2,
-                  maxValue: 8,
-                  step: 1,
-                  haptics: true,
-                  onChanged: (value) => setState(() => _maxHumi = value),
-                ),
-                Switch(
-                  value: isSwitchedHumi,
-                  onChanged: (value) {
-                    setState(() {
-                      tempHumi = value;
-                    });
-                  },
-                  activeTrackColor: Colors.lightBlueAccent,
-                  activeColor: Colors.blue,
-                ),
-              ],
-            ),
+            title: Text('기기 삭제'),
+            content: Text("정말로 삭제 하시겠습니까?"),
             actions: <Widget>[
               TextButton(
-                child: Text('CANCEL'),
+                child: Text('취소'),
                 onPressed: () {
                   setState(() {
                     Navigator.pop(context);
@@ -219,22 +149,131 @@ class _EditScreenState extends State<EditScreen> {
                 },
               ),
               TextButton(
-                child: Text('OK'),
-                onPressed: () {
-                  setState(() {
-                    DBHelper().updateDeviceCondition(
+                child: Text('확인'),
+                onPressed: () async {
+                  await DBHelper()
+                      .deleteSavedDevice(selectedDevice.getserialNumber());
+                  await DBHelper()
+                      .deleteDevice(selectedDevice.peripheral.identifier);
+                  Navigator.pop(context, 'goback');
+                },
+              ),
+            ],
+          );
+        });
+  }
+
+  Future<void> _displayConditionInputDialog(BuildContext context) async {
+    return showDialog(
+        context: context,
+        builder: (context) {
+          return StatefulBuilder(builder: (context, setState) {
+            return AlertDialog(
+              title: Text('적정 온도 설정'),
+              content: Container(
+                height: MediaQuery.of(context).size.height * 0.6,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    SizedBox(height: 16),
+                    Divider(color: Colors.grey, height: 32),
+                    Text('최저 온도 (°C)',
+                        style: Theme.of(context).textTheme.headline6),
+                    NumberPicker(
+                      axis: Axis.horizontal,
+                      value: _minTemp,
+                      minValue: -20,
+                      maxValue: 40,
+                      step: 1,
+                      haptics: true,
+                      onChanged: (value) => setState(() => _minTemp = value),
+                    ),
+                    Text('최고 온도 (°C)',
+                        style: Theme.of(context).textTheme.headline6),
+                    NumberPicker(
+                      axis: Axis.horizontal,
+                      value: _maxTemp,
+                      minValue: -20,
+                      maxValue: 40,
+                      step: 1,
+                      haptics: true,
+                      onChanged: (value) => setState(() => _maxTemp = value),
+                    ),
+                    Switch(
+                      value: isSwitchedTemp,
+                      onChanged: (value) {
+                        setState(() {
+                          isSwitchedTemp = value;
+                        });
+                      },
+                      activeTrackColor: Colors.lightBlueAccent,
+                      activeColor: Colors.blue,
+                    ),
+                    Divider(color: Colors.grey, height: 32),
+                    SizedBox(height: 16),
+                    // Text('최저 온도 (%)',
+                    //     style: Theme.of(context).textTheme.headline6),
+                    // NumberPicker(
+                    //   axis: Axis.horizontal,
+                    //   value: _minHumi,
+                    //   minValue: -20,
+                    //   maxValue: 40,
+                    //   step: 1,
+                    //   haptics: true,
+                    //   onChanged: (value) => setState(() => _minHumi = value),
+                    // ),
+                    // Text('최고 온도 (%)',
+                    //     style: Theme.of(context).textTheme.headline6),
+                    // NumberPicker(
+                    //   axis: Axis.horizontal,
+                    //   value: _maxHumi,
+                    //   minValue: -20,
+                    //   maxValue: 40,
+                    //   step: 1,
+                    //   haptics: true,
+                    //   onChanged: (value) => setState(() => _maxHumi = value),
+                    // ),
+                    // Switch(
+                    //   value: tempHumi,
+                    //   onChanged: (value) {
+                    //     setState(() {
+                    //       tempHumi = value;
+                    //     });
+                    //   },
+                    //   activeTrackColor: Colors.lightBlueAccent,
+                    //   activeColor: Colors.blue,
+                    // ),
+                  ],
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(
+                  child: Text('취소'),
+                  onPressed: () {
+                    setState(() {
+                      Navigator.pop(context);
+                    });
+                  },
+                ),
+                TextButton(
+                  child: Text('저장'),
+                  onPressed: () {
+                    setState(() {
+                      DBHelper().updateDeviceCondition(
                         selectedDevice.peripheral.identifier,
                         _minTemp,
                         _maxTemp,
                         _minHumi,
                         _maxHumi,
-                        'false');
-                    Navigator.pop(context);
-                  });
-                },
-              ),
-            ],
-          );
+                        isSwitchedTemp == false ? 'false' : 'true',
+                      );
+                      Navigator.pop(context);
+                    });
+                  },
+                ),
+              ],
+            );
+          });
         });
   }
 
@@ -290,6 +329,12 @@ class _EditScreenState extends State<EditScreen> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+        builder: (context, child) {
+          return MediaQuery(
+            child: child,
+            data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
+          );
+        },
         debugShowCheckedModeBanner: false,
         title: 'OPTILO',
         theme: ThemeData(
@@ -305,9 +350,11 @@ class _EditScreenState extends State<EditScreen> {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Text(
-                      'OPTILO',
+                      'Thermo Cert',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontWeight: FontWeight.w300),
+                      style: TextStyle(
+                          fontSize: MediaQuery.of(context).size.width / 18,
+                          fontWeight: FontWeight.w600),
                     ),
                   ]),
             ),
@@ -321,7 +368,7 @@ class _EditScreenState extends State<EditScreen> {
                     width: MediaQuery.of(context).size.width * 1.0,
                     child: Column(children: [
                       Expanded(
-                          flex: 4,
+                          flex: 5,
                           child: InkWell(
                             onTap: () async {
                               // 여기 2
@@ -340,44 +387,49 @@ class _EditScreenState extends State<EditScreen> {
                                       MainAxisAlignment.spaceBetween,
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.start,
+                                    Column(
                                       children: [
-                                        Text(' '),
-                                        Image(
-                                          image: AssetImage('images/T301.png'),
-                                          fit: BoxFit.contain,
-                                          width: MediaQuery.of(context)
-                                                  .size
-                                                  .width *
-                                              0.13,
-                                          height: MediaQuery.of(context)
-                                                  .size
-                                                  .width *
-                                              0.13,
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.start,
+                                          children: [
+                                            Text(' '),
+                                            Image(
+                                              image:
+                                                  AssetImage('images/T301.png'),
+                                              fit: BoxFit.contain,
+                                              width: MediaQuery.of(context)
+                                                      .size
+                                                      .width *
+                                                  0.13,
+                                              height: MediaQuery.of(context)
+                                                      .size
+                                                      .width *
+                                                  0.13,
+                                            ),
+                                            Text('  '),
+                                            Text(
+                                              selectedDevice.getDeviceId(),
+                                              style: whiteTextStyle,
+                                            ),
+                                          ],
                                         ),
-                                        Text('  '),
-                                        Text(
-                                          selectedDevice.getDeviceId(),
-                                          style: whiteTextStyle,
-                                        ),
+                                        Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                  ' ' +
+                                                      selectedDevice
+                                                          .getBattery()
+                                                          .toString() +
+                                                      '% ',
+                                                  style: smallWhiteTextStyle),
+                                              getbatteryImage(
+                                                  selectedDevice.getBattery()),
+                                            ]),
                                       ],
                                     ),
-                                    Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                              ' ' +
-                                                  selectedDevice
-                                                      .getBattery()
-                                                      .toString() +
-                                                  '% ',
-                                              style: smallWhiteTextStyle),
-                                          getbatteryImage(
-                                              selectedDevice.getBattery()),
-                                        ]),
                                     Row(
                                       mainAxisAlignment:
                                           MainAxisAlignment.spaceAround,
@@ -387,13 +439,13 @@ class _EditScreenState extends State<EditScreen> {
                                                 iconSize: MediaQuery.of(context)
                                                         .size
                                                         .width *
-                                                    0.2,
+                                                    0.3,
                                                 icon: Icon(
                                                   Icons.image,
                                                   size: MediaQuery.of(context)
                                                           .size
                                                           .width *
-                                                      0.2,
+                                                      0.3,
                                                 ),
                                                 onPressed: () {
                                                   takePicture(context);
@@ -403,11 +455,11 @@ class _EditScreenState extends State<EditScreen> {
                                                 width: MediaQuery.of(context)
                                                         .size
                                                         .width *
-                                                    0.2,
+                                                    0.3,
                                                 height: MediaQuery.of(context)
                                                         .size
                                                         .width *
-                                                    0.2,
+                                                    0.3,
                                                 fit: BoxFit.contain,
                                               ),
                                         selectedDevice.secondPath == ''
@@ -415,13 +467,13 @@ class _EditScreenState extends State<EditScreen> {
                                                 iconSize: MediaQuery.of(context)
                                                         .size
                                                         .width *
-                                                    0.2,
+                                                    0.3,
                                                 icon: Icon(
                                                   Icons.image,
                                                   size: MediaQuery.of(context)
                                                           .size
                                                           .width *
-                                                      0.2,
+                                                      0.3,
                                                 ),
                                                 onPressed: () {
                                                   takePicture2(context);
@@ -431,18 +483,18 @@ class _EditScreenState extends State<EditScreen> {
                                                 width: MediaQuery.of(context)
                                                         .size
                                                         .width *
-                                                    0.2,
+                                                    0.3,
                                                 height: MediaQuery.of(context)
                                                         .size
                                                         .width *
-                                                    0.2)
+                                                    0.3)
                                       ],
                                     ),
                                   ],
                                 )),
                           )),
                       Expanded(
-                        flex: 2,
+                        flex: 4,
                         child: SizedBox(),
                       ),
                       Expanded(
@@ -465,10 +517,48 @@ class _EditScreenState extends State<EditScreen> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Text('Device Name : ',
+                                      Text('디바이스 이름 : ',
                                           style: whiteBoldTextStyle),
-                                      Text(selectedDevice.getDeviceId(),
-                                          style: whiteTextStyle)
+                                      FutureBuilder(
+                                          future: DBHelper().getAllDevices(),
+                                          builder: (BuildContext context,
+                                              AsyncSnapshot<List<DeviceInfo>>
+                                                  snapshot) {
+                                            if (snapshot.hasData) {
+                                              List<DeviceInfo> devices =
+                                                  snapshot.data;
+                                              String temp = '';
+                                              for (int i = 0;
+                                                  i < devices.length;
+                                                  i++) {
+                                                if (devices[i].macAddress ==
+                                                    selectedDevice.peripheral
+                                                        .identifier) {
+                                                  temp = devices[i].deviceName;
+                                                  break;
+                                                }
+                                              }
+                                              if (temp == '') {
+                                                return Text(
+                                                  selectedDevice.getDeviceId(),
+                                                  style: whiteTextStyle,
+                                                );
+                                              } else {
+                                                selectedDevice.deviceName =
+                                                    temp;
+
+                                                return Text(
+                                                  temp,
+                                                  style: whiteTextStyle,
+                                                );
+                                              }
+                                            } else {
+                                              return Text(
+                                                selectedDevice.getDeviceId(),
+                                                style: whiteTextStyle,
+                                              );
+                                            }
+                                          })
                                     ],
                                   ),
                                   Column(
@@ -511,14 +601,12 @@ class _EditScreenState extends State<EditScreen> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Text('Desired Conditions : ',
+                                      Text('온도 조건 : ',
                                           style: whiteBoldTextStyle),
-                                      Text(
-                                          'Temperature(Min): _ _°C, Temperature(Max): _ _°C',
+                                      Text('온도(최저): 2°C / 온도(최고): 8°C ',
                                           style: smallWhiteTextStyle),
-                                      Text(
-                                          'Humidity(Min): _ _%, Humidity(Max): _ _%',
-                                          style: smallWhiteTextStyle)
+                                      // Text('습도(최저): _ _%, 습도(최고): _ _%',
+                                      //     style: smallWhiteTextStyle)
                                     ],
                                   ),
                                   Column(
@@ -542,13 +630,10 @@ class _EditScreenState extends State<EditScreen> {
                                 ],
                               ))),
                       Expanded(
-                        flex: 2,
-                        child: SizedBox(),
-                      ),
-                      Expanded(
                           flex: 2,
                           child: Container(
-                              padding: EdgeInsets.only(top: 3, left: 12),
+                              margin: EdgeInsets.only(top: 3),
+                              padding: EdgeInsets.only(top: 5, left: 12),
                               width: MediaQuery.of(context).size.width * 0.98,
                               decoration: BoxDecoration(
                                   color: Color.fromRGBO(71, 71, 71, 1),
@@ -559,7 +644,7 @@ class _EditScreenState extends State<EditScreen> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('Device Mac Address : ',
+                                  Text('Mac Address : ',
                                       style: whiteBoldTextStyle),
                                   Text(selectedDevice.peripheral.identifier,
                                       style: whiteTextStyle)
@@ -568,10 +653,12 @@ class _EditScreenState extends State<EditScreen> {
                       Expanded(
                           flex: 2,
                           child: TextButton(
-                            onPressed: () {
-                              DBHelper().deleteDevice(
-                                  selectedDevice.peripheral.identifier);
-                              Navigator.pop(context);
+                            onPressed: () async {
+                              await deleteDeviceDialog(context).then((value) =>
+                                  value == 'goback'
+                                      ? Navigator.pop(context,
+                                          selectedDevice.peripheral.identifier)
+                                      : print(''));
                             },
                             child: Container(
                                 margin: EdgeInsets.only(
@@ -589,7 +676,7 @@ class _EditScreenState extends State<EditScreen> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
-                                    Text('Delete', style: whiteBoldTextStyle),
+                                    Text('삭제하기', style: whiteBoldTextStyle),
                                   ],
                                 )),
                           )),
@@ -717,15 +804,15 @@ showUploadDialog(BuildContext context, int size) {
 TextStyle whiteBoldTextStyle = TextStyle(
   fontSize: 18,
   color: Color.fromRGBO(255, 255, 255, 1),
-  fontWeight: FontWeight.w600,
+  fontWeight: FontWeight.w700,
 );
 TextStyle whiteTextStyle = TextStyle(
-  fontSize: 13,
+  fontSize: 16,
   color: Color.fromRGBO(255, 255, 255, 1),
-  fontWeight: FontWeight.w300,
+  fontWeight: FontWeight.w700,
 );
 TextStyle smallWhiteTextStyle = TextStyle(
-  fontSize: 12,
+  fontSize: 14,
   color: Color.fromRGBO(255, 255, 255, 1),
-  fontWeight: FontWeight.w300,
+  fontWeight: FontWeight.w500,
 );

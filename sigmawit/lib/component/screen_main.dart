@@ -31,6 +31,8 @@ class ScanscreenState extends State<Scanscreen> {
   String message = '';
   Peripheral _curPeripheral; // 연결된 장치 변수
   List<BleDeviceItem> deviceList = []; // BLE 장치 리스트 변수
+  List<DeviceInfo> savedDeviceList = []; // 저장된 BLE 장치 리스트 변수
+  List<String> savedList = []; // 추가된 장치 리스트 변수
   //List<BleDeviceItem> myDeviceList = [];
   String _statusText = ''; // BLE 상태 변수
   loc.LocationData currentLocation;
@@ -45,9 +47,9 @@ class ScanscreenState extends State<Scanscreen> {
   Timer _timer;
   int _start = 0;
   bool isStart = false;
-  Future<List<DeviceInfo>> savedList;
   Map<String, String> idMapper;
   // double width;
+  TextEditingController _textFieldController;
 
   String firstImagePath = '';
   String secondImagePath = '';
@@ -59,7 +61,6 @@ class ScanscreenState extends State<Scanscreen> {
   void initState() {
     super.initState();
     // getCurrentLocation();
-    savedList = DBHelper().getAllDevices();
     currentDeviceName = '';
     currentTemp = '-';
     currentHumi = '-';
@@ -70,6 +71,7 @@ class ScanscreenState extends State<Scanscreen> {
   void dispose() {
     // ->> 사라진 위젯에서 cancel하려고 해서 에러 발생
     _stopMonitoringTemperature();
+    _bleManager.destroyClient();
     super.dispose();
   }
 
@@ -118,6 +120,8 @@ class ScanscreenState extends State<Scanscreen> {
       print(cameraResult.toString());
       deviceList[index].firstPath = cameraResult.toString();
       setState(() {});
+      await DBHelper().updateImagePath(deviceList[index].peripheral.identifier,
+          cameraResult.toString(), 'first');
       // setState(() {
       //   firstImagePath = cameraResult.toString();
       // });
@@ -141,6 +145,8 @@ class ScanscreenState extends State<Scanscreen> {
     if (cameraResult != '' && cameraResult != null) {
       print(cameraResult.toString());
       deviceList[index].secondPath = cameraResult.toString();
+      await DBHelper().updateImagePath(deviceList[index].peripheral.identifier,
+          cameraResult.toString(), 'second');
       setState(() {});
       // setState(() {
       //   secondImagePath = cameraResult.toString();
@@ -178,7 +184,7 @@ class ScanscreenState extends State<Scanscreen> {
 
     monitoringStreamSubscription = characteristicUpdates.listen(
       (notifyResult) async {
-        print(notifyResult.toString());
+        print('혹시 이거임 ?' + notifyResult.toString());
         if (notifyResult[10] == 0x03) {
           int index = -1;
           for (var i = 0; i < deviceList.length; i++) {
@@ -193,19 +199,21 @@ class ScanscreenState extends State<Scanscreen> {
             print('여기 걸리나 ?');
             await _stopMonitoringTemperature();
             if (flag == 0) {
-              Navigator.push(
+              await Navigator.push(
                   context,
                   MaterialPageRoute(
                       builder: (context) => DetailScreen(
                           currentDevice: deviceList[index],
-                          minmaxStamp: minmaxStamp)));
+                          minmaxStamp: minmaxStamp))).then((value) =>
+                  value == null ? Navigator.pop(context) : print(''));
+              await _stopMonitoringTemperature();
             } else {
               Navigator.push(
                   context,
                   MaterialPageRoute(
                       builder: (context) => EditScreen(
                             currentDevice: deviceList[index],
-                          )));
+                          ))).then((value) => print(value));
             }
           }
         }
@@ -321,6 +329,9 @@ class ScanscreenState extends State<Scanscreen> {
   // BLE 초기화 함수
   void init() async {
     //ble 매니저 생성
+    // savedDeviceList = await DBHelper().getAllDevices();
+    savedList = await DBHelper().getAllSavedList();
+    setState(() {});
     await _bleManager
         .createClient(
             restoreStateIdentifier: "example-restore-state-identifier",
@@ -371,15 +382,35 @@ class ScanscreenState extends State<Scanscreen> {
                 flex: 4,
                 child: InkWell(
                   onTap: () async {
-                    Navigator.push(
+                    await Navigator.push(
                         context,
                         MaterialPageRoute(
                             builder: (context) => EditScreen(
                                   currentDevice: deviceList[index],
-                                )));
+                                ))).then((value) => {
+                              value != null
+                                  ? deviceList.remove(deviceList[index])
+                                  : {},
+                              value != null
+                                  ? savedList.remove(deviceList[index]
+                                          .peripheral
+                                          .identifier
+                                          .substring(9, 11) +
+                                      deviceList[index]
+                                          .peripheral
+                                          .identifier
+                                          .substring(12, 14) +
+                                      deviceList[index]
+                                          .peripheral
+                                          .identifier
+                                          .substring(15, 17))
+                                  : {},
+                            }
 
-                    // 여기 2
-                    // await startRoutine(index);
+                        // 여기 2
+                        // await startRoutine(index);
+
+                        );
                   },
                   child: Container(
                       padding: EdgeInsets.only(top: 5, left: 2),
@@ -417,24 +448,32 @@ class ScanscreenState extends State<Scanscreen> {
                                                 .peripheral
                                                 .identifier) {
                                           temp = devices[i].deviceName;
+
+                                          deviceList[index].firstPath =
+                                              devices[i].firstPath;
+                                          deviceList[index].secondPath =
+                                              devices[i].secondPath;
+
                                           break;
                                         }
                                       }
                                       if (temp == '') {
                                         return Text(
                                           deviceList[index].getDeviceId(),
-                                          style: whiteTextStyle,
+                                          style: whiteTextStyle(context),
                                         );
                                       } else {
+                                        deviceList[index].deviceName = temp;
+
                                         return Text(
                                           temp,
-                                          style: whiteTextStyle,
+                                          style: whiteTextStyle(context),
                                         );
                                       }
                                     } else {
                                       return Text(
                                         deviceList[index].getDeviceId(),
-                                        style: whiteTextStyle,
+                                        style: whiteTextStyle(context),
                                       );
                                     }
                                   })
@@ -455,16 +494,31 @@ class ScanscreenState extends State<Scanscreen> {
                                                 0.15,
                                       ),
                                       onPressed: () {
+                                        // confirmPicture(
+                                        //     context,
+                                        //     deviceList[index].firstPath,
+                                        //     'first',
+                                        //     index);
                                         takePicture(context, index);
                                       })
-                                  : Image.file(
-                                      File(deviceList[index].firstPath),
-                                      width: MediaQuery.of(context).size.width *
-                                          0.15,
-                                      height:
-                                          MediaQuery.of(context).size.width *
-                                              0.15,
-                                      fit: BoxFit.contain,
+                                  : InkWell(
+                                      onTap: () {
+                                        confirmPicture(
+                                            context,
+                                            deviceList[index].firstPath,
+                                            'first',
+                                            index);
+                                      },
+                                      child: Image.file(
+                                        File(deviceList[index].firstPath),
+                                        width:
+                                            MediaQuery.of(context).size.width *
+                                                0.15,
+                                        height:
+                                            MediaQuery.of(context).size.width *
+                                                0.15,
+                                        fit: BoxFit.fitHeight,
+                                      ),
                                     ),
                               deviceList[index].secondPath == ''
                                   ? new IconButton(
@@ -478,15 +532,32 @@ class ScanscreenState extends State<Scanscreen> {
                                                 0.15,
                                       ),
                                       onPressed: () {
+                                        // confirmPicture(
+                                        //     context,
+                                        //     deviceList[index].secondPath,
+                                        //     'second',
+                                        //     index);
                                         takePicture2(context, index);
                                       })
-                                  : Image.file(
-                                      File(deviceList[index].secondPath),
-                                      width: MediaQuery.of(context).size.width *
-                                          0.15,
-                                      height:
-                                          MediaQuery.of(context).size.width *
-                                              0.15)
+                                  : InkWell(
+                                      onTap: () {
+                                        confirmPicture(
+                                            context,
+                                            deviceList[index].secondPath,
+                                            'second',
+                                            index);
+                                      },
+                                      child: Image.file(
+                                          File(deviceList[index].secondPath),
+                                          width: MediaQuery.of(context)
+                                                  .size
+                                                  .width *
+                                              0.15,
+                                          height: MediaQuery.of(context)
+                                                  .size
+                                                  .width *
+                                              0.15),
+                                    )
                             ],
                           )
                         ],
@@ -496,7 +567,7 @@ class ScanscreenState extends State<Scanscreen> {
               flex: 3,
               child: InkWell(
                   onTap: () async {
-                    await connect(index, 0);
+                    // await connect(index, 0);
                     // 여기 2
                     // await startRoutine(index);
                   },
@@ -534,7 +605,7 @@ class ScanscreenState extends State<Scanscreen> {
                                             .getTemperature()
                                             .toString() +
                                         '°C',
-                                    style: bigTextStyle),
+                                    style: bigTextStyle(context)),
                               ],
                             ),
                             Row(
@@ -550,7 +621,7 @@ class ScanscreenState extends State<Scanscreen> {
                                 Text(
                                   deviceList[index].getHumidity().toString() +
                                       '%',
-                                  style: bigTextStyle,
+                                  style: bigTextStyle(context),
                                 )
                               ],
                             ),
@@ -573,7 +644,7 @@ class ScanscreenState extends State<Scanscreen> {
                                                 .getBattery()
                                                 .toString() +
                                             '%',
-                                        style: lastUpdateTextStyle,
+                                        style: lastUpdateTextStyle(context),
                                       ),
                                     ],
                                   )
@@ -585,18 +656,20 @@ class ScanscreenState extends State<Scanscreen> {
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
-                                  Text('Last updated  ',
-                                      style: lastUpdateTextStyle),
+                                  Text(
+                                    '최근 업데이트  ',
+                                    style: lastUpdateTextStyle(context),
+                                  ),
                                   deviceList[index].lastUpdateTime != null
                                       ? Text(
                                           DateFormat('yyyy-MM-dd - HH:mm')
                                               .format(deviceList[index]
                                                   .lastUpdateTime),
-                                          style: updateTextStyle,
+                                          style: updateTextStyle(context),
                                         )
                                       : Text(
                                           '-',
-                                          style: updateTextStyle,
+                                          style: updateTextStyle(context),
                                         ),
                                   Text('  ')
                                 ],
@@ -684,10 +757,10 @@ class ScanscreenState extends State<Scanscreen> {
         });
         // 새로 발견된 장치면 추가
         if (!findDevice) {
-          if (scanResult.peripheral.identifier.substring(0, 8) == 'AC:23:3F') {
-            print('이거임 : ' +
-                scanResult.advertisementData.manufacturerData.toString());
-          }
+          // if (scanResult.peripheral.identifier.substring(0, 8) == 'A4:C1:38') {
+          //   print('이거임 : ' +
+          //       scanResult.advertisementData.manufacturerData.toString());
+          // }
           if (name != "Unknowns") {
             // print(name);
             // if (name.substring(0, 3) == 'IOT') {
@@ -699,7 +772,29 @@ class ScanscreenState extends State<Scanscreen> {
                     scanResult.peripheral,
                     scanResult.advertisementData,
                     'scan');
-                deviceList.add(currentItem);
+
+                print(currentItem.peripheral.identifier);
+                if (savedList.contains(currentItem.getserialNumber())) {
+                  deviceList.add(currentItem);
+                  // var temp =
+                  //     DBHelper().getDevice(scanResult.peripheral.identifier);
+
+                  // if (temp == Null) {
+                  //   print('Add ! -> ' + currentItem.getserialNumber());
+                  //   // DBHelper().createData(new DeviceInfo(
+                  //   //   deviceName: '',
+                  //   //   isDesiredConditionOn: 'false',
+                  //   //   macAddress: scanResult.peripheral.identifier,
+                  //   //   minTemper: 2,
+                  //   //   maxTemper: 8,
+                  //   //   minHumidity: 2,
+                  //   //   maxHumidity: 8,
+                  //   //   firstPath: '',
+                  //   //   secondPath: '',
+                  //   // ));
+                  // }
+                }
+
                 //print(scanResult.advertisementData.manufacturerData.toString());
                 // print(scanResult.peripheral.name +
                 //     "의 advertiseData  \n"
@@ -762,7 +857,7 @@ class ScanscreenState extends State<Scanscreen> {
     if (_connected) {
       //이미 연결상태면 연결 해제후 종료
       await _curPeripheral?.disconnectOrCancelConnection();
-      return;
+      return false;
     }
 
     //선택한 장치의 peripheral 값을 가져온다.
@@ -823,6 +918,7 @@ class ScanscreenState extends State<Scanscreen> {
             _connected = false;
             print("${peripheral.name} has DISCONNECTED");
             _stopMonitoringTemperature();
+
             deviceList[index].connectionState = 'scan';
             setBLEState('<연결 종료>');
             if (processState == 2) {
@@ -830,6 +926,8 @@ class ScanscreenState extends State<Scanscreen> {
                 processState = 4;
               });
             }
+            print('여긴 오냐');
+            return false;
             //if (failFlag) {}
           }
           break;
@@ -858,7 +956,9 @@ class ScanscreenState extends State<Scanscreen> {
 
       //연결 시작!
       await peripheral
-          .connect(isAutoConnect: false, refreshGatt: true)
+          .connect(
+        isAutoConnect: false,
+      )
           .then((_) {
         this._curPeripheral = peripheral;
         //연결이 되면 장치의 모든 서비스와 캐릭터리스틱을 검색한다.
@@ -883,42 +983,225 @@ class ScanscreenState extends State<Scanscreen> {
           setState(() {});
         });
       });
+      print(_connected.toString());
       return _connected;
     });
   }
 
-  TextStyle lastUpdateTextStyle = TextStyle(
-    fontSize: 15,
-    color: Color.fromRGBO(5, 5, 5, 1),
-    fontWeight: FontWeight.w300,
-  );
-  TextStyle updateTextStyle = TextStyle(
-    fontSize: 15,
-    color: Color.fromRGBO(0xe8, 0x52, 0x55, 1),
-    fontWeight: FontWeight.w300,
-  );
+  TextStyle lastUpdateTextStyle(BuildContext context) {
+    return TextStyle(
+      fontSize: MediaQuery.of(context).size.width / 25,
+      color: Color.fromRGBO(5, 5, 5, 1),
+      fontWeight: FontWeight.w700,
+    );
+  }
+
+  TextStyle updateTextStyle(BuildContext context) {
+    return TextStyle(
+      fontSize: MediaQuery.of(context).size.width / 24,
+      color: Color.fromRGBO(0xe8, 0x52, 0x55, 1),
+      fontWeight: FontWeight.w500,
+    );
+  }
+
   TextStyle boldTextStyle = TextStyle(
     fontSize: 30,
     color: Color.fromRGBO(255, 255, 255, 1),
     fontWeight: FontWeight.w700,
   );
-
-  TextStyle bigTextStyle = TextStyle(
-    fontSize: 33,
-    color: Color.fromRGBO(50, 50, 50, 1),
-    fontWeight: FontWeight.w200,
-  );
+  TextStyle bigTextStyle(BuildContext context) {
+    return TextStyle(
+      fontSize: MediaQuery.of(context).size.width / 10,
+      color: Color.fromRGBO(50, 50, 50, 1),
+      fontWeight: FontWeight.w400,
+    );
+  }
 
   TextStyle thinTextStyle = TextStyle(
     fontSize: 22,
     color: Color.fromRGBO(244, 244, 244, 1),
     fontWeight: FontWeight.w500,
   );
+
+  confirmPicture(
+      BuildContext context, String imagePath, String flag, int index) {
+    return showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.0)),
+          backgroundColor: Color.fromRGBO(255, 255, 255, 0),
+          elevation: 0,
+          child: Container(
+              width: MediaQuery.of(context).size.width * 1.0,
+              height: MediaQuery.of(context).size.height * 1.0,
+              padding: EdgeInsets.all(10.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Expanded(
+                    flex: 6,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        imagePath == ''
+                            ? Icon(
+                                Icons.camera,
+                                size: MediaQuery.of(context).size.width * 0.5,
+                              )
+                            : flag == 'first'
+                                ? Image.file(
+                                    File(deviceList[index].firstPath),
+                                    width:
+                                        MediaQuery.of(context).size.width * 0.7,
+                                    height: MediaQuery.of(context).size.height *
+                                        0.7,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Image.file(
+                                    File(deviceList[index].secondPath),
+                                    width:
+                                        MediaQuery.of(context).size.width * 0.7,
+                                    height: MediaQuery.of(context).size.height *
+                                        0.7,
+                                    fit: BoxFit.cover,
+                                  )
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                      flex: 1,
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              TextButton(
+                                  onPressed: () {
+                                    Navigator.of(context).pop();
+                                  },
+                                  child: Text('취소',
+                                      style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 30,
+                                          fontWeight: FontWeight.bold))),
+                              TextButton(
+                                  onPressed: () {
+                                    if (flag == 'first') {
+                                      takePicture(context, index);
+                                      Navigator.of(context).pop();
+                                    } else if (flag == 'second') {
+                                      takePicture2(context, index);
+                                      Navigator.of(context).pop();
+                                    }
+                                  },
+                                  child: Text(
+                                    '재촬영',
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 30,
+                                        fontWeight: FontWeight.bold),
+                                  )),
+                            ],
+                          ),
+                          flag == 'second'
+                              ? Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    TextButton(
+                                        onPressed: () async {
+                                          await connect(index, 0);
+                                        },
+                                        child: Text(
+                                          '운송완료',
+                                          style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 30,
+                                              fontWeight: FontWeight.bold),
+                                        )),
+                                  ],
+                                )
+                              : SizedBox()
+                        ],
+                      ))
+                ],
+              )),
+        );
+      },
+    );
+  }
+
+  Future<void> addDeviceDialog(BuildContext context) async {
+    String valueText = '';
+    return showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: Text('디바이스 추가'),
+            content: TextField(
+              onChanged: (value) {
+                setState(() {
+                  valueText = value;
+                });
+              },
+              controller: _textFieldController,
+              decoration: InputDecoration(hintText: 'Mac 주소를 입력해주세요'),
+            ),
+            actions: <Widget>[
+              TextButton(
+                child: Text('취소'),
+                onPressed: () {
+                  setState(() {
+                    Navigator.pop(context);
+                  });
+                },
+              ),
+              TextButton(
+                  child: Text('등록'),
+                  onPressed: () {
+                    DBHelper().createSavedMac(valueText);
+                    if (valueText.length == 6) {
+                      DBHelper().createData(new DeviceInfo(
+                        deviceName: '',
+                        isDesiredConditionOn: 'false',
+                        macAddress: 'A4:C1:38:' +
+                            valueText.substring(0, 2) +
+                            ':' +
+                            valueText.substring(2, 4) +
+                            ':' +
+                            valueText.substring(4, 6),
+                        minTemper: 2,
+                        maxTemper: 8,
+                        minHumidity: 2,
+                        maxHumidity: 8,
+                        firstPath: '',
+                        secondPath: '',
+                      ));
+                    }
+                    setState(() {
+                      savedList.add(valueText);
+                    });
+
+                    Navigator.pop(context);
+                    // print(savedList);
+                  }),
+            ],
+          );
+        });
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+        builder: (context, child) {
+          return MediaQuery(
+            child: child,
+            data: MediaQuery.of(context).copyWith(textScaleFactor: 1.0),
+          );
+        },
         debugShowCheckedModeBanner: false,
-        title: 'OPTILO2',
+        title: 'OPTILO',
         theme: ThemeData(
           // primarySwatch: Colors.grey,
           primaryColor: Color.fromRGBO(0x61, 0xB2, 0xD0, 1),
@@ -931,11 +1214,29 @@ class ScanscreenState extends State<Scanscreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text(
-                'OPTILO',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontWeight: FontWeight.w300),
+              Expanded(
+                flex: 8,
+                child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                  Text(
+                    'Thermo Cert',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: MediaQuery.of(context).size.width / 18,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ]),
               ),
+              Expanded(
+                  flex: 4,
+                  child:
+                      Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                    new IconButton(
+                      icon: new Icon(Icons.add, size: 30),
+                      onPressed: () {
+                        addDeviceDialog(context);
+                      },
+                    )
+                  ])),
             ],
           )),
           body: Container(
@@ -1003,11 +1304,14 @@ class ScanscreenState extends State<Scanscreen> {
       );
   }
 
-  TextStyle whiteTextStyle = TextStyle(
-    fontSize: 18,
-    color: Color.fromRGBO(255, 255, 255, 1),
-    fontWeight: FontWeight.w200,
-  );
+  TextStyle whiteTextStyle(BuildContext context) {
+    return TextStyle(
+      fontSize: MediaQuery.of(context).size.width / 18,
+      color: Color.fromRGBO(255, 255, 255, 1),
+      fontWeight: FontWeight.w500,
+    );
+  }
+
   TextStyle btnTextStyle = TextStyle(
     fontSize: 20,
     color: Color.fromRGBO(255, 255, 255, 1),
@@ -1063,6 +1367,7 @@ class ScanscreenState extends State<Scanscreen> {
               "PermissionStatus.granted" &&
           statuses[Permission.storage].toString() ==
               'PermissionStatus.granted') {
+        scan();
         return 'Pass';
       }
     }
