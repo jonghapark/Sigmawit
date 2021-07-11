@@ -99,15 +99,18 @@ class _EditScreenState extends State<EditScreen> {
                   setState(() {
                     codeDialog = valueText;
                   });
+                  print('fetchDatas');
 
                   var temp = await DBHelper()
-                      .getDevice(selectedDevice.peripheral.identifier);
-
+                      .getDevice(selectedDevice.getserialNumber());
+                  print('뭘까 ? ' + selectedDevice.getserialNumber());
+                  print(temp);
+                  print('fetchDatas End');
                   if (temp == Null) {
                     await DBHelper().createData(new DeviceInfo(
                       deviceName: codeDialog,
                       isDesiredConditionOn: 'false',
-                      macAddress: selectedDevice.peripheral.identifier,
+                      macAddress: selectedDevice.getserialNumber(),
                       minTemper: 2,
                       maxTemper: 8,
                       minHumidity: 2,
@@ -115,14 +118,14 @@ class _EditScreenState extends State<EditScreen> {
                       firstPath: '',
                       secondPath: '',
                     ));
-                    print('createData');
-
+                    print('createData -> ' + selectedDevice.getserialNumber());
                     Navigator.pop(context);
                   } else {
                     await DBHelper().updateDeviceName(
-                        selectedDevice.peripheral.identifier, codeDialog);
+                        selectedDevice.getserialNumber(), codeDialog);
                     selectedDevice.deviceName = codeDialog;
                     print('updateData');
+                    setState(() {});
                     Navigator.pop(context);
                   }
                 },
@@ -154,7 +157,7 @@ class _EditScreenState extends State<EditScreen> {
                   await DBHelper()
                       .deleteSavedDevice(selectedDevice.getserialNumber());
                   await DBHelper()
-                      .deleteDevice(selectedDevice.peripheral.identifier);
+                      .deleteDevice(selectedDevice.getserialNumber());
                   Navigator.pop(context, 'goback');
                 },
               ),
@@ -260,7 +263,7 @@ class _EditScreenState extends State<EditScreen> {
                   onPressed: () {
                     setState(() {
                       DBHelper().updateDeviceCondition(
-                        selectedDevice.peripheral.identifier,
+                        selectedDevice.getserialNumber(),
                         _minTemp,
                         _maxTemp,
                         _minHumi,
@@ -455,11 +458,11 @@ class _EditScreenState extends State<EditScreen> {
                                                 width: MediaQuery.of(context)
                                                         .size
                                                         .width *
-                                                    0.3,
+                                                    0.27,
                                                 height: MediaQuery.of(context)
                                                         .size
                                                         .width *
-                                                    0.3,
+                                                    0.27,
                                                 fit: BoxFit.contain,
                                               ),
                                         selectedDevice.secondPath == ''
@@ -467,13 +470,13 @@ class _EditScreenState extends State<EditScreen> {
                                                 iconSize: MediaQuery.of(context)
                                                         .size
                                                         .width *
-                                                    0.3,
+                                                    0.27,
                                                 icon: Icon(
                                                   Icons.image,
                                                   size: MediaQuery.of(context)
                                                           .size
                                                           .width *
-                                                      0.3,
+                                                      0.27,
                                                 ),
                                                 onPressed: () {
                                                   takePicture2(context);
@@ -483,18 +486,18 @@ class _EditScreenState extends State<EditScreen> {
                                                 width: MediaQuery.of(context)
                                                         .size
                                                         .width *
-                                                    0.3,
+                                                    0.27,
                                                 height: MediaQuery.of(context)
                                                         .size
                                                         .width *
-                                                    0.3)
+                                                    0.27)
                                       ],
                                     ),
                                   ],
                                 )),
                           )),
                       Expanded(
-                        flex: 4,
+                        flex: 3,
                         child: SizedBox(),
                       ),
                       Expanded(
@@ -532,8 +535,8 @@ class _EditScreenState extends State<EditScreen> {
                                                   i < devices.length;
                                                   i++) {
                                                 if (devices[i].macAddress ==
-                                                    selectedDevice.peripheral
-                                                        .identifier) {
+                                                    selectedDevice
+                                                        .getserialNumber()) {
                                                   temp = devices[i].deviceName;
                                                   break;
                                                 }
@@ -816,3 +819,51 @@ TextStyle smallWhiteTextStyle = TextStyle(
   color: Color.fromRGBO(255, 255, 255, 1),
   fontWeight: FontWeight.w500,
 );
+
+showMyDialog_Delete(BuildContext context) {
+  bool manuallyClosed = false;
+  Future.delayed(Duration(seconds: 2)).then((_) {
+    if (!manuallyClosed) {
+      Navigator.of(context).pop();
+    }
+  });
+  return showDialog(
+    context: context,
+    builder: (context) {
+      return Dialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(30.0)),
+        backgroundColor: Color.fromRGBO(0x61, 0xB2, 0xD0, 1),
+        elevation: 16.0,
+        child: Container(
+            width: MediaQuery.of(context).size.width / 3,
+            height: MediaQuery.of(context).size.height / 4,
+            padding: EdgeInsets.all(10.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Expanded(
+                  flex: 4,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Icon(
+                        Icons.bluetooth,
+                        color: Colors.white,
+                        size: MediaQuery.of(context).size.width / 5,
+                      ),
+                      Text("기기를 삭제했습니다. !",
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 18),
+                          textAlign: TextAlign.center),
+                    ],
+                  ),
+                ),
+              ],
+            )),
+      );
+    },
+  );
+}

@@ -81,6 +81,7 @@ class DBHelper {
   //Create
   createData(DeviceInfo device) async {
     final db = await database;
+    // print(device.macAddress);
     var res = await db.rawInsert(
         'INSERT INTO $TableName(name, mac, conditionflag, minTemp, maxTemp, minHumi , maxHumi, firstPath, secondPath) VALUES(?,?,?,?,?,?,?,?,?)',
         [device.deviceName, device.macAddress, 'false', 0, 0, 0, 0, '', '']);
@@ -89,16 +90,19 @@ class DBHelper {
 
   //Create
   createSavedMac(String mac) async {
+    print(mac.toUpperCase());
     final db = await database;
-    var res = await db.rawInsert('INSERT INTO savedList(mac) VALUES(?)', [mac]);
+    var res = await db
+        .rawInsert('INSERT INTO savedList(mac) VALUES(?)', [mac.toUpperCase()]);
     return res;
   }
 
   //Read
   getDevice(String macAddress) async {
     final db = await database;
-    var res = await db
-        .rawQuery('SELECT * FROM $TableName WHERE mac = ?', [macAddress]);
+    print('이거 검색함 ' + macAddress.toUpperCase());
+    var res = await db.rawQuery(
+        'SELECT * FROM $TableName WHERE mac = ?', [macAddress.toUpperCase()]);
     return res.isNotEmpty
         ? DeviceInfo(
             macAddress: res.first['mac'],
@@ -116,8 +120,8 @@ class DBHelper {
   //Update-name
   updateDeviceName(String macAddress, String newName) async {
     final db = await database;
-    var res = await db.rawUpdate(
-        'UPDATE $TableName SET name = ? WHERE mac = ?', [newName, macAddress]);
+    var res = await db.rawUpdate('UPDATE $TableName SET name = ? WHERE mac = ?',
+        [newName, macAddress.toUpperCase()]);
   }
 
   //Update-imagePath
@@ -181,13 +185,16 @@ class DBHelper {
     final db = await database;
     var res =
         db.rawDelete('DELETE FROM $TableName WHERE mac = ?', [macAddress]);
+    print('DeleteDevice');
     return res;
   }
 
   //Delete
   deleteSavedDevice(String mac) async {
+    // print(mac);
     final db = await database;
     var res = db.rawDelete('DELETE FROM savedList WHERE mac = ?', [mac]);
+    print('DeleteSavedDevice');
     return res;
   }
 

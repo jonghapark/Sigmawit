@@ -63,13 +63,14 @@ class _DetailScreenState extends State<DetailScreen> {
   void initState() {
     super.initState();
     // result = allText();
-    getCurrentLocation();
+    // getCurrentLocation();
     fetchLogData();
   }
 
   @override
   void dispose() {
     super.dispose();
+    monitoringStreamSubscription?.cancel();
   }
 
   void takeScreenshot() async {
@@ -81,11 +82,17 @@ class _DetailScreenState extends State<DetailScreen> {
     });
   }
 
-  List<pw.Text> allText() {
-    List<pw.Text> result = [];
+  List<List<pw.Text>> allText() {
+    List<List<pw.Text>> result = [];
+    int listInx = -1;
     for (int i = 0; i < filteredDatas.length; i++) {
+      if (i % 50 == 0) {
+        result.add([]);
+        listInx++;
+      }
+
       if (i > 8) {
-        result.add(pw.Text((i + 1).toString() +
+        result[listInx].add(pw.Text((i + 1).toString() +
             '. ' +
             filteredDatas[i].temperature.toString() +
             '°C / ' +
@@ -95,7 +102,7 @@ class _DetailScreenState extends State<DetailScreen> {
                 .format(filteredDatas[i].timestamp) +
             '\n'));
       } else {
-        result.add(pw.Text('0' +
+        result[listInx].add(pw.Text('0' +
             (i + 1).toString() +
             '. ' +
             filteredDatas[i].temperature.toString() +
@@ -133,19 +140,21 @@ class _DetailScreenState extends State<DetailScreen> {
         },
       ),
     );
-    await pdf.addPage(
-      pw.Page(
+    List<List<pw.Text>> temp = allText();
+    for (int i = 0; i < temp.length; i++) {
+      await pdf.addPage(pw.Page(
         pageFormat: PdfPageFormat.a4,
         build: (pw.Context context) {
           return pw.Center(
               // 100개 정도의 데이터
               child: pw.Column(
             mainAxisAlignment: pw.MainAxisAlignment.start,
-            children: [pw.Text('Log Datas')] + allText(),
+            children: [pw.Text('Log Datas\n\n')] + temp[i],
           )); //getting error here
         },
-      ),
-    );
+      ));
+    }
+
     String now = DateTime.now().toString();
     File pdfFile = File(filePath + '/report_' + now + '.pdf');
     pdfFile.writeAsBytesSync(await pdf.save());
@@ -437,7 +446,7 @@ class _DetailScreenState extends State<DetailScreen> {
         print("Error while monitoring characteristic \n$error");
         if (dataFetchEnd == false) {
           await showMyDialog(context);
-          Navigator.of(context).pop();
+          // Navigator.of(context).pop();
         }
       },
       cancelOnError: true,
@@ -765,6 +774,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                             count.toString() +
                                             '개'),
                                       ],
+                                      // 1분단위 세시간 -> 180개 -> 3분단위 -> 60개 -> 3분단위 100 -> 300 분 5시간 ?
                                     ),
                                     Column(
                                       mainAxisAlignment:
@@ -857,6 +867,12 @@ showMyDialog(BuildContext context) {
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
                               fontSize: 14),
+                          textAlign: TextAlign.center),
+                      Text("다시시도해주세요",
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 13),
                           textAlign: TextAlign.center),
                     ],
                   ),

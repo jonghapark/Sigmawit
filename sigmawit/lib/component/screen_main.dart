@@ -70,9 +70,20 @@ class ScanscreenState extends State<Scanscreen> {
   @override
   void dispose() {
     // ->> 사라진 위젯에서 cancel하려고 해서 에러 발생
-    _stopMonitoringTemperature();
-    _bleManager.destroyClient();
     super.dispose();
+    // _stopMonitoringTemperature();
+    _bleManager.destroyClient();
+  }
+
+  endRoutine(value, index) {
+    if (value != null) {
+      print("??? " + deviceList[index].getserialNumber());
+      savedList.remove(deviceList[index].getserialNumber());
+      deviceList.remove(deviceList[index]);
+      print('저장목록 : ' + savedList.toString());
+      print('디바이스목록 : ' + deviceList.toString());
+    }
+    setState(() {});
   }
 
   Future<Post> sendtoServer(Data data) async {
@@ -120,12 +131,15 @@ class ScanscreenState extends State<Scanscreen> {
       print(cameraResult.toString());
       deviceList[index].firstPath = cameraResult.toString();
       setState(() {});
-      await DBHelper().updateImagePath(deviceList[index].peripheral.identifier,
+      await DBHelper().updateImagePath(deviceList[index].getserialNumber(),
           cameraResult.toString(), 'first');
+
       // setState(() {
       //   firstImagePath = cameraResult.toString();
       // });
+
     }
+    return cameraResult;
   }
 
   // 카메라 호출 함수
@@ -145,13 +159,15 @@ class ScanscreenState extends State<Scanscreen> {
     if (cameraResult != '' && cameraResult != null) {
       print(cameraResult.toString());
       deviceList[index].secondPath = cameraResult.toString();
-      await DBHelper().updateImagePath(deviceList[index].peripheral.identifier,
+      await DBHelper().updateImagePath(deviceList[index].getserialNumber(),
           cameraResult.toString(), 'second');
       setState(() {});
+
       // setState(() {
       //   secondImagePath = cameraResult.toString();
       // });
     }
+    return cameraResult;
   }
 
   Future<void> monitorCharacteristic(Peripheral peripheral, flag) async {
@@ -184,7 +200,10 @@ class ScanscreenState extends State<Scanscreen> {
 
     monitoringStreamSubscription = characteristicUpdates.listen(
       (notifyResult) async {
-        print('혹시 이거임 ?' + notifyResult.toString());
+        // print('혹시 이거임 ?' + notifyResult.toString());
+        if (notifyResult[10] == 0x0a) {
+          Navigator.of(context).pop();
+        }
         if (notifyResult[10] == 0x03) {
           int index = -1;
           for (var i = 0; i < deviceList.length; i++) {
@@ -197,7 +216,7 @@ class ScanscreenState extends State<Scanscreen> {
           if (index != -1) {
             Uint8List minmaxStamp = getMinMaxTimestamp(notifyResult);
             print('여기 걸리나 ?');
-            await _stopMonitoringTemperature();
+
             if (flag == 0) {
               await Navigator.push(
                   context,
@@ -214,11 +233,16 @@ class ScanscreenState extends State<Scanscreen> {
                       builder: (context) => EditScreen(
                             currentDevice: deviceList[index],
                           ))).then((value) => print(value));
+              await _stopMonitoringTemperature();
             }
           }
         }
       },
       onError: (error) {
+        final BleError temperrors = error;
+        if (temperrors.errorCode.value == 201) {
+          print('그르게');
+        }
         print("Error while monitoring characteristic \n$error");
       },
       cancelOnError: true,
@@ -241,16 +265,29 @@ class ScanscreenState extends State<Scanscreen> {
 
     Uint8List macaddress = deviceList[index].getMacAddress();
     print('쓰기 시작 ');
-    var writeCharacteristics = await deviceList[index]
-        .peripheral
-        .writeCharacteristic(
-            '00001000-0000-1000-8000-00805f9b34fb',
-            '00001001-0000-1000-8000-00805f9b34fb',
-            Uint8List.fromList([0x55, 0xAA, 0x01, 0x05] +
-                deviceList[index].getMacAddress() +
-                [0x02, 0x04] +
-                timestamp),
-            true);
+    if (flag == 0) {
+      var writeCharacteristics = await deviceList[index]
+          .peripheral
+          .writeCharacteristic(
+              '00001000-0000-1000-8000-00805f9b34fb',
+              '00001001-0000-1000-8000-00805f9b34fb',
+              Uint8List.fromList([0x55, 0xAA, 0x01, 0x05] +
+                  deviceList[index].getMacAddress() +
+                  [0x02, 0x04] +
+                  timestamp),
+              true);
+    } else if (flag == 1) {
+      // 데이터 삭제 시작
+      var writeCharacteristics = await deviceList[index]
+          .peripheral
+          .writeCharacteristic(
+              '00001000-0000-1000-8000-00805f9b34fb',
+              '00001001-0000-1000-8000-00805f9b34fb',
+              Uint8List.fromList([0x55, 0xAA, 0x01, 0x05] +
+                  deviceList[index].getMacAddress() +
+                  [0x09, 0x01, 0x01]),
+              true);
+    }
   }
 
   // 타이머 시작
@@ -334,7 +371,7 @@ class ScanscreenState extends State<Scanscreen> {
     setState(() {});
     await _bleManager
         .createClient(
-            restoreStateIdentifier: "example-restore-state-identifier",
+            restoreStateIdentifier: "hello",
             restoreStateAction: (peripherals) {
               peripherals?.forEach((peripheral) {
                 print("Restored peripheral: ${peripheral.name}");
@@ -346,22 +383,21 @@ class ScanscreenState extends State<Scanscreen> {
   }
 
   // 권한 확인 함수 권한 없으면 권한 요청 화면 표시, 안드로이드만 상관 있음
-  _checkPermissions() async {
-    if (Platform.isAndroid) {
-      if (await Permission.location.request().isGranted) {
-        print('입장하냐?');
-        scan();
-        return;
-      }
-      Map<Permission, PermissionStatus> statuses =
-          await [Permission.location].request();
-      print("여기는요?" + statuses[Permission.location].toString());
-      if (statuses[Permission.location].toString() ==
-          "PermissionStatus.granted") {
-        //getCurrentLocation();
-        scan();
-      }
-    }
+  _checkPermissions() {
+    // if (await Permission.location.request().isGranted) {
+    //   print('입장하냐?');
+    //   scan();
+    //   return;
+    // }
+    // Map<Permission, PermissionStatus> statuses =
+    //     await [Permission.location].request();
+    // if (statuses[Permission.location].toString() ==
+    //     "PermissionStatus.granted") {
+    //   //getCurrentLocation();
+    //   scan();
+    // }
+
+    scan();
   }
 
   //장치 화면에 출력하는 위젯 함수
@@ -375,7 +411,7 @@ class ScanscreenState extends State<Scanscreen> {
               color: Colors.white,
               boxShadow: [customeBoxShadow()],
               borderRadius: BorderRadius.all(Radius.circular(5))),
-          height: MediaQuery.of(context).size.height * 0.3,
+          height: MediaQuery.of(context).size.height * 0.33,
           width: MediaQuery.of(context).size.width * 0.99,
           child: Column(children: [
             Expanded(
@@ -388,29 +424,10 @@ class ScanscreenState extends State<Scanscreen> {
                             builder: (context) => EditScreen(
                                   currentDevice: deviceList[index],
                                 ))).then((value) => {
-                              value != null
-                                  ? deviceList.remove(deviceList[index])
-                                  : {},
-                              value != null
-                                  ? savedList.remove(deviceList[index]
-                                          .peripheral
-                                          .identifier
-                                          .substring(9, 11) +
-                                      deviceList[index]
-                                          .peripheral
-                                          .identifier
-                                          .substring(12, 14) +
-                                      deviceList[index]
-                                          .peripheral
-                                          .identifier
-                                          .substring(15, 17))
-                                  : {},
-                            }
-
-                        // 여기 2
-                        // await startRoutine(index);
-
-                        );
+                          endRoutine(value, index),
+                        });
+                    // 여기 2
+                    // await startRoutine(index);
                   },
                   child: Container(
                       padding: EdgeInsets.only(top: 5, left: 2),
@@ -443,10 +460,13 @@ class ScanscreenState extends State<Scanscreen> {
                                       List<DeviceInfo> devices = snapshot.data;
                                       String temp = '';
                                       for (int i = 0; i < devices.length; i++) {
+                                        // print(devices[i].macAddress);
+                                        // print(devices[i].macAddress);
+                                        // print(deviceList[index]
+                                        //     .getserialNumber());
                                         if (devices[i].macAddress ==
                                             deviceList[index]
-                                                .peripheral
-                                                .identifier) {
+                                                .getserialNumber()) {
                                           temp = devices[i].deviceName;
 
                                           deviceList[index].firstPath =
@@ -493,13 +513,25 @@ class ScanscreenState extends State<Scanscreen> {
                                             MediaQuery.of(context).size.width *
                                                 0.15,
                                       ),
-                                      onPressed: () {
+                                      onPressed: () async {
                                         // confirmPicture(
                                         //     context,
                                         //     deviceList[index].firstPath,
                                         //     'first',
                                         //     index);
-                                        takePicture(context, index);
+
+                                        String pictureResult =
+                                            await takePicture(context, index);
+                                        if (pictureResult != null &&
+                                            pictureResult != '') {
+                                          deviceList[index].firstPath =
+                                              pictureResult;
+                                          confirmPicture(
+                                              context,
+                                              deviceList[index].firstPath,
+                                              'first',
+                                              index);
+                                        }
                                       })
                                   : InkWell(
                                       onTap: () {
@@ -531,13 +563,25 @@ class ScanscreenState extends State<Scanscreen> {
                                             MediaQuery.of(context).size.width *
                                                 0.15,
                                       ),
-                                      onPressed: () {
+                                      onPressed: () async {
                                         // confirmPicture(
                                         //     context,
                                         //     deviceList[index].secondPath,
                                         //     'second',
                                         //     index);
-                                        takePicture2(context, index);
+
+                                        String pictureResult =
+                                            await takePicture2(context, index);
+                                        if (pictureResult != null &&
+                                            pictureResult != '') {
+                                          deviceList[index].secondPath =
+                                              pictureResult;
+                                          confirmPicture(
+                                              context,
+                                              deviceList[index].secondPath,
+                                              'second',
+                                              index);
+                                        }
                                       })
                                   : InkWell(
                                       onTap: () {
@@ -628,6 +672,47 @@ class ScanscreenState extends State<Scanscreen> {
                           ],
                         ),
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            Row(
+                              children: [
+                                Text('시작 시간 : '),
+                                FutureBuilder(
+                                    future: File(deviceList[index].firstPath)
+                                        .lastModified(),
+                                    builder: (BuildContext context,
+                                        AsyncSnapshot<DateTime> snapshot) {
+                                      if (snapshot.hasData) {
+                                        DateTime mintime = snapshot.data;
+                                        return Text(DateFormat('dd일 HH:mm:ss')
+                                            .format(mintime));
+                                      } else {
+                                        return Text('--일 --:--:--');
+                                      }
+                                    }),
+                              ],
+                            ),
+                            Row(
+                              children: [
+                                Text('종료 시간 : '),
+                                FutureBuilder(
+                                    future: File(deviceList[index].secondPath)
+                                        .lastModified(),
+                                    builder: (BuildContext context,
+                                        AsyncSnapshot<DateTime> snapshot) {
+                                      if (snapshot.hasData) {
+                                        DateTime maxtime = snapshot.data;
+                                        return Text(DateFormat('dd일 HH:mm:ss')
+                                            .format(maxtime));
+                                      } else {
+                                        return Text('--일 --:--:--');
+                                      }
+                                    }),
+                              ],
+                            ),
+                          ],
+                        ),
+                        Row(
                           children: [
                             Expanded(
                               flex: 3,
@@ -706,66 +791,33 @@ class ScanscreenState extends State<Scanscreen> {
     );
   }
 
+  // 1. 엑셀 2. 서버구조 3. 영어 과제
   //scan 함수
   void scan() async {
     if (!_isScanning) {
+      print('스캔시작');
       deviceList.clear(); //기존 장치 리스트 초기화
       //SCAN 시작
+      if (Platform.isAndroid) {
+        _bleManager
+            .startPeripheralScan(scanMode: ScanMode.lowLatency)
+            .listen((scanResult) {
+          //listen 이벤트 형식으로 장치가 발견되면 해당 루틴을 계속 탐.
+          //periphernal.name이 없으면 advertisementData.localName확인 이것도 없다면 unknown으로 표시
+          //print(scanResult.peripheral.name);
+          var name = scanResult.peripheral.name ??
+              scanResult.advertisementData.localName ??
+              "Unknown";
+          // 기존에 존재하는 장치면 업데이트
+          // print('lenght: ' + deviceList.length.toString());
+          var findDevice = deviceList.any((element) {
+            if (element.peripheral.identifier ==
+                scanResult.peripheral.identifier) {
+              element.peripheral = scanResult.peripheral;
+              element.advertisementData = scanResult.advertisementData;
+              element.rssi = scanResult.rssi;
 
-      _bleManager
-          .startPeripheralScan(scanMode: ScanMode.balanced)
-          .listen((scanResult) {
-        //listen 이벤트 형식으로 장치가 발견되면 해당 루틴을 계속 탐.
-        //periphernal.name이 없으면 advertisementData.localName확인 이것도 없다면 unknown으로 표시
-        //print(scanResult.peripheral.name);
-        var name = scanResult.peripheral.name ??
-            scanResult.advertisementData.localName ??
-            "Unknown";
-        // 기존에 존재하는 장치면 업데이트
-        var findDevice = deviceList.any((element) {
-          if (element.peripheral.identifier ==
-              scanResult.peripheral.identifier) {
-            element.peripheral = scanResult.peripheral;
-            element.advertisementData = scanResult.advertisementData;
-            element.rssi = scanResult.rssi;
-
-            if (currentLocation != null) {
-              BleDeviceItem currentItem = new BleDeviceItem(
-                  name,
-                  scanResult.rssi,
-                  scanResult.peripheral,
-                  scanResult.advertisementData,
-                  'scan');
-
-              Data sendData = new Data(
-                battery: currentItem.getBattery().toString(),
-                deviceName:
-                    'OP_' + currentItem.getDeviceId().toString().substring(7),
-                humi: currentItem.getHumidity().toString(),
-                temper: currentItem.getTemperature().toString(),
-                lat: currentLocation.latitude.toString() ?? '',
-                lng: currentLocation.longitude.toString() ?? '',
-                time: new DateTime.now().toString(),
-                lex: '',
-              );
-              // sendtoServer(sendData);
-            }
-
-            return true;
-          }
-          return false;
-        });
-        // 새로 발견된 장치면 추가
-        if (!findDevice) {
-          // if (scanResult.peripheral.identifier.substring(0, 8) == 'A4:C1:38') {
-          //   print('이거임 : ' +
-          //       scanResult.advertisementData.manufacturerData.toString());
-          // }
-          if (name != "Unknowns") {
-            // print(name);
-            // if (name.substring(0, 3) == 'IOT') {
-            if (name != null) {
-              if (name.substring(0, 4) == 'T301') {
+              if (currentLocation != null) {
                 BleDeviceItem currentItem = new BleDeviceItem(
                     name,
                     scanResult.rssi,
@@ -773,49 +825,223 @@ class ScanscreenState extends State<Scanscreen> {
                     scanResult.advertisementData,
                     'scan');
 
-                print(currentItem.peripheral.identifier);
-                if (savedList.contains(currentItem.getserialNumber())) {
-                  deviceList.add(currentItem);
-                  // var temp =
-                  //     DBHelper().getDevice(scanResult.peripheral.identifier);
-
-                  // if (temp == Null) {
-                  //   print('Add ! -> ' + currentItem.getserialNumber());
-                  //   // DBHelper().createData(new DeviceInfo(
-                  //   //   deviceName: '',
-                  //   //   isDesiredConditionOn: 'false',
-                  //   //   macAddress: scanResult.peripheral.identifier,
-                  //   //   minTemper: 2,
-                  //   //   maxTemper: 8,
-                  //   //   minHumidity: 2,
-                  //   //   maxHumidity: 8,
-                  //   //   firstPath: '',
-                  //   //   secondPath: '',
-                  //   // ));
-                  // }
-                }
-
-                //print(scanResult.advertisementData.manufacturerData.toString());
-                // print(scanResult.peripheral.name +
-                //     "의 advertiseData  \n"
+                Data sendData = new Data(
+                  battery: currentItem.getBattery().toString(),
+                  deviceName:
+                      'OP_' + currentItem.getDeviceId().toString().substring(7),
+                  humi: currentItem.getHumidity().toString(),
+                  temper: currentItem.getTemperature().toString(),
+                  lat: currentLocation.latitude.toString() ?? '',
+                  lng: currentLocation.longitude.toString() ?? '',
+                  time: new DateTime.now().toString(),
+                  lex: '',
+                );
+                // sendtoServer(sendData);
               }
+
+              return true;
             }
-            // else if (scanResult.peripheral.identifier.substring(0, 8) ==
-            //     'AC:23:3F') {
-            //   print('name : ' + scanResult.peripheral.name ?? '');
-            //   print('id : ' + scanResult.peripheral.identifier ?? '');
-            //   print('data : ' +
-            //           scanResult.advertisementData.manufacturerData
-            //               .toString() ??
-            //       '');
+            return false;
+          });
+          // 새로 발견된 장치면 추가
+          if (!findDevice) {
+            // if (scanResult.peripheral.identifier.substring(0, 8) == 'A4:C1:38') {
+            //   print('이거임 : ' +
+            //       scanResult.advertisementData.manufacturerData.toString());
             // }
+            if (name != "Unknowns") {
+              // print(name);
+              // if (name.substring(0, 3) == 'IOT') {
+              if (name != null) {
+                if (name.substring(0, 4) == 'T301') {
+                  BleDeviceItem currentItem = new BleDeviceItem(
+                      name,
+                      scanResult.rssi,
+                      scanResult.peripheral,
+                      scanResult.advertisementData,
+                      'scan');
+                  bool isExist = false;
+
+                  for (int i = 0; i < savedList.length; i++) {
+                    // print(savedList[i] + ' ' + currentItem.getserialNumber());
+                    if (savedList[i] == currentItem.getserialNumber()) {
+                      isExist = true;
+                      break;
+                    }
+                  }
+
+                  // print(currentItem.peripheral.identifier);
+                  // print(currentItem.getserialNumber().toString());
+                  // print(savedList.toString());
+
+                  if (isExist) {
+                    print('인 !');
+                    print(savedList);
+                    deviceList.add(currentItem);
+                    // var temp
+                    //     DBHelper().getDevice(scanResult.peripheral.identifier);
+
+                    // if (temp == Null) {
+                    //   print('Add ! -> ' + currentItem.getserialNumber());
+                    //   // DBHelper().createData(new DeviceInfo(
+                    //   //   deviceName: '',
+                    //   //   isDesiredConditionOn: 'false',
+                    //   //   macAddress: scanResult.peripheral.identifier,
+                    //   //   minTemper: 2,
+                    //   //   maxTemper: 8,
+                    //   //   minHumidity: 2,
+                    //   //   maxHumidity: 8,
+                    //   //   firstPath: '',
+                    //   //   secondPath: '',
+                    //   // ));
+                    // }
+                  }
+
+                  //print(scanResult.advertisementData.manufacturerData.toString());
+                  // print(scanResult.peripheral.name +
+                  //     "의 advertiseData  \n"
+                }
+              }
+              // else if (scanResult.peripheral.identifier.substring(0, 8) ==
+              //     'AC:23:3F') {
+              //   print('name : ' + scanResult.peripheral.name ?? '');
+              //   print('id : ' + scanResult.peripheral.identifier ?? '');
+              //   print('data : ' +
+              //           scanResult.advertisementData.manufacturerData
+              //               .toString() ??
+              //       '');
+              // }
+            }
           }
-        }
-        //55 aa - 01 05 - a4 c1 38 ec 59 06 - 01 - 07 - 08 b6 17 70 61 00 01
-        //55 aa - 01 05 - a4 c1 38 ec 59 06 - 02 - 04 - 60 43 24 96
-        //페이지 갱신용
-        setState(() {});
-      });
+          //55 aa - 01 05 - a4 c1 38 ec 59 06 - 01 - 07 - 08 b6 17 70 61 00 01
+          //55 aa - 01 05 - a4 c1 38 ec 59 06 - 02 - 04 - 60 43 24 96
+          //페이지 갱신용
+          setState(() {});
+        });
+      } else {
+        print('리스너 시작');
+        BluetoothState tempResult = await _bleManager.bluetoothState();
+        print(tempResult.toString());
+
+        _bleManager.startPeripheralScan().listen((scanResult) {
+          //listen 이벤트 형식으로 장치가 발견되면 해당 루틴을 계속 탐.
+          //periphernal.name이 없으면 advertisementData.localName확인 이것도 없다면 unknown으로 표시
+          print(scanResult.peripheral.name);
+          var name = scanResult.peripheral.name ??
+              scanResult.advertisementData.localName ??
+              "Unknown";
+          // 기존에 존재하는 장치면 업데이트
+          // print('lenght: ' + deviceList.length.toString());
+          var findDevice = deviceList.any((element) {
+            if (element.peripheral.identifier ==
+                scanResult.peripheral.identifier) {
+              element.peripheral = scanResult.peripheral;
+              element.advertisementData = scanResult.advertisementData;
+              element.rssi = scanResult.rssi;
+
+              if (currentLocation != null) {
+                BleDeviceItem currentItem = new BleDeviceItem(
+                    name,
+                    scanResult.rssi,
+                    scanResult.peripheral,
+                    scanResult.advertisementData,
+                    'scan');
+
+                Data sendData = new Data(
+                  battery: currentItem.getBattery().toString(),
+                  deviceName:
+                      'OP_' + currentItem.getDeviceId().toString().substring(7),
+                  humi: currentItem.getHumidity().toString(),
+                  temper: currentItem.getTemperature().toString(),
+                  lat: currentLocation.latitude.toString() ?? '',
+                  lng: currentLocation.longitude.toString() ?? '',
+                  time: new DateTime.now().toString(),
+                  lex: '',
+                );
+                // sendtoServer(sendData);
+              }
+
+              return true;
+            }
+            return false;
+          });
+          // 새로 발견된 장치면 추가
+          if (!findDevice) {
+            // if (scanResult.peripheral.identifier.substring(0, 8) == 'A4:C1:38') {
+            //   print('이거임 : ' +
+            //       scanResult.advertisementData.manufacturerData.toString());
+            // }
+            if (name != "Unknowns") {
+              // print(name);
+              // if (name.substring(0, 3) == 'IOT') {
+              if (name != null) {
+                if (name.substring(0, 4) == 'T301' ||
+                    name.substring(0, 4) == 'T201') {
+                  BleDeviceItem currentItem = new BleDeviceItem(
+                      name,
+                      scanResult.rssi,
+                      scanResult.peripheral,
+                      scanResult.advertisementData,
+                      'scan');
+                  bool isExist = false;
+
+                  for (int i = 0; i < savedList.length; i++) {
+                    // print(savedList[i] + ' ' + currentItem.getserialNumber());
+                    if (savedList[i] == currentItem.getserialNumber()) {
+                      isExist = true;
+                      break;
+                    }
+                  }
+
+                  // print(currentItem.peripheral.identifier);
+                  // print(currentItem.getserialNumber().toString());
+                  // print(savedList.toString());
+
+                  if (isExist) {
+                    print('인 !');
+                    print(savedList);
+                    deviceList.add(currentItem);
+                    // var temp
+                    //     DBHelper().getDevice(scanResult.peripheral.identifier);
+
+                    // if (temp == Null) {
+                    //   print('Add ! -> ' + currentItem.getserialNumber());
+                    //   // DBHelper().createData(new DeviceInfo(
+                    //   //   deviceName: '',
+                    //   //   isDesiredConditionOn: 'false',
+                    //   //   macAddress: scanResult.peripheral.identifier,
+                    //   //   minTemper: 2,
+                    //   //   maxTemper: 8,
+                    //   //   minHumidity: 2,
+                    //   //   maxHumidity: 8,
+                    //   //   firstPath: '',
+                    //   //   secondPath: '',
+                    //   // ));
+                    // }
+                  }
+
+                  //print(scanResult.advertisementData.manufacturerData.toString());
+                  // print(scanResult.peripheral.name +
+                  //     "의 advertiseData  \n"
+                }
+              }
+              // else if (scanResult.peripheral.identifier.substring(0, 8) ==
+              //     'AC:23:3F') {
+              //   print('name : ' + scanResult.peripheral.name ?? '');
+              //   print('id : ' + scanResult.peripheral.identifier ?? '');
+              //   print('data : ' +
+              //           scanResult.advertisementData.manufacturerData
+              //               .toString() ??
+              //       '');
+              // }
+            }
+          }
+          //55 aa - 01 05 - a4 c1 38 ec 59 06 - 01 - 07 - 08 b6 17 70 61 00 01
+          //55 aa - 01 05 - a4 c1 38 ec 59 06 - 02 - 04 - 60 43 24 96
+          //페이지 갱신용
+          setState(() {});
+        });
+      }
       setState(() {
         //BLE 상태가 변경되면 화면도 갱신
         _isScanning = true;
@@ -854,6 +1080,7 @@ class ScanscreenState extends State<Scanscreen> {
 
   //연결 함수
   connect(index, flag) async {
+    bool goodConnection = false;
     if (_connected) {
       //이미 연결상태면 연결 해제후 종료
       await _curPeripheral?.disconnectOrCancelConnection();
@@ -874,7 +1101,7 @@ class ScanscreenState extends State<Scanscreen> {
             //연결됨
             print('연결 완료 !');
             _curPeripheral = peripheral;
-            getCurrentLocation();
+            // getCurrentLocation();
             //peripheral.
             deviceList[index].connectionState = 'connect';
             setBLEState('연결 완료');
@@ -908,17 +1135,18 @@ class ScanscreenState extends State<Scanscreen> {
         case PeripheralConnectionState.connecting:
           {
             deviceList[index].connectionState = 'connecting';
+            showMyDialog_Connecting(context);
             print('연결중입니당!');
             setBLEState('<연결 중>');
           } //연결중
           break;
         case PeripheralConnectionState.disconnected:
           {
+            showMyDialog_Disconnect(context);
             //해제됨
             _connected = false;
             print("${peripheral.name} has DISCONNECTED");
             _stopMonitoringTemperature();
-
             deviceList[index].connectionState = 'scan';
             setBLEState('<연결 종료>');
             if (processState == 2) {
@@ -1122,6 +1350,24 @@ class ScanscreenState extends State<Scanscreen> {
                                         )),
                                   ],
                                 )
+                              : SizedBox(),
+                          flag == 'first'
+                              ? Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    TextButton(
+                                        onPressed: () async {
+                                          await connect(index, 1);
+                                        },
+                                        child: Text(
+                                          '운송시작',
+                                          style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 30,
+                                              fontWeight: FontWeight.bold),
+                                        )),
+                                  ],
+                                )
                               : SizedBox()
                         ],
                       ))
@@ -1159,18 +1405,16 @@ class ScanscreenState extends State<Scanscreen> {
               ),
               TextButton(
                   child: Text('등록'),
-                  onPressed: () {
-                    DBHelper().createSavedMac(valueText);
+                  onPressed: () async {
+                    String temp = valueText.toUpperCase();
+                    await DBHelper().createSavedMac(temp);
+                    // print('길이몇인데 ? ' + valueText.length.toString());
                     if (valueText.length == 6) {
-                      DBHelper().createData(new DeviceInfo(
+                      // print('valueText: ' + temp);
+                      await DBHelper().createData(new DeviceInfo(
                         deviceName: '',
                         isDesiredConditionOn: 'false',
-                        macAddress: 'A4:C1:38:' +
-                            valueText.substring(0, 2) +
-                            ':' +
-                            valueText.substring(2, 4) +
-                            ':' +
-                            valueText.substring(4, 6),
+                        macAddress: temp,
                         minTemper: 2,
                         maxTemper: 8,
                         minHumidity: 2,
@@ -1178,10 +1422,15 @@ class ScanscreenState extends State<Scanscreen> {
                         firstPath: '',
                         secondPath: '',
                       ));
+                      // print(temp.substring(0, 2) +
+                      //     ":" +
+                      //     temp.substring(2, 4) +
+                      //     ':' +
+                      //     temp.substring(4, 6));
+                      setState(() {
+                        savedList.add(temp);
+                      });
                     }
-                    setState(() {
-                      savedList.add(valueText);
-                    });
 
                     Navigator.pop(context);
                     // print(savedList);
@@ -1355,21 +1604,17 @@ class ScanscreenState extends State<Scanscreen> {
   }
 
   _checkPermissionCamera() async {
-    if (Platform.isAndroid) {
-      if (await Permission.camera.request().isGranted) {
-        scan();
-        return '';
-      }
-      Map<Permission, PermissionStatus> statuses =
-          await [Permission.camera, Permission.storage].request();
-      //print("여기는요?" + statuses[Permission.location].toString());
-      if (statuses[Permission.camera].toString() ==
-              "PermissionStatus.granted" &&
-          statuses[Permission.storage].toString() ==
-              'PermissionStatus.granted') {
-        scan();
-        return 'Pass';
-      }
+    if (await Permission.camera.request().isGranted) {
+      scan();
+      return '';
+    }
+    Map<Permission, PermissionStatus> statuses =
+        await [Permission.camera, Permission.storage].request();
+    //print("여기는요?" + statuses[Permission.location].toString());
+    if (statuses[Permission.camera].toString() == "PermissionStatus.granted" &&
+        statuses[Permission.storage].toString() == 'PermissionStatus.granted') {
+      scan();
+      return 'Pass';
     }
   }
 
@@ -1400,4 +1645,100 @@ class ScanscreenState extends State<Scanscreen> {
       currentLocation = _locationData;
     });
   }
+}
+
+showMyDialog_Disconnect(BuildContext context) {
+  bool manuallyClosed = false;
+  Future.delayed(Duration(seconds: 1)).then((_) {
+    if (!manuallyClosed) {
+      Navigator.of(context).pop();
+    }
+  });
+  return showDialog(
+    context: context,
+    builder: (context) {
+      return Dialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(30.0)),
+        backgroundColor: Color.fromRGBO(0x61, 0xB2, 0xD0, 1),
+        elevation: 16.0,
+        child: Container(
+            width: MediaQuery.of(context).size.width / 3,
+            height: MediaQuery.of(context).size.height / 4,
+            padding: EdgeInsets.all(10.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Expanded(
+                  flex: 4,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Icon(
+                        Icons.cancel_outlined,
+                        color: Colors.white,
+                        size: MediaQuery.of(context).size.width / 5,
+                      ),
+                      Text("연결이 끊어졌습니다 !",
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 18),
+                          textAlign: TextAlign.center),
+                    ],
+                  ),
+                ),
+              ],
+            )),
+      );
+    },
+  );
+}
+
+showMyDialog_Connecting(BuildContext context) {
+  bool manuallyClosed = false;
+  Future.delayed(Duration(seconds: 2)).then((_) {
+    if (!manuallyClosed) {
+      Navigator.of(context).pop();
+    }
+  });
+  return showDialog(
+    context: context,
+    builder: (context) {
+      return Dialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(30.0)),
+        backgroundColor: Color.fromRGBO(0x61, 0xB2, 0xD0, 1),
+        elevation: 16.0,
+        child: Container(
+            width: MediaQuery.of(context).size.width / 3,
+            height: MediaQuery.of(context).size.height / 4,
+            padding: EdgeInsets.all(10.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Expanded(
+                  flex: 4,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Icon(
+                        Icons.bluetooth,
+                        color: Colors.white,
+                        size: MediaQuery.of(context).size.width / 5,
+                      ),
+                      Text("기기와 연결중입니다 !",
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 18),
+                          textAlign: TextAlign.center),
+                    ],
+                  ),
+                ),
+              ],
+            )),
+      );
+    },
+  );
 }

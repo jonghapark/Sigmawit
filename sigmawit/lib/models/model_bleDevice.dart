@@ -63,10 +63,7 @@ class BleDeviceItem {
     return 'Sensor_' + result;
   }
 
-  getserialNumber() {
-    if (this.deviceName != 'T301') {
-      return this.deviceName;
-    }
+  String getserialNumber() {
     String tmp = ByteData.sublistView(
             this.advertisementData.manufacturerData.sublist(7, 9))
         .getUint16(0)
@@ -83,7 +80,8 @@ class BleDeviceItem {
     } else {
       result += tmps2.toRadixString(16);
     }
-    return result;
+    // print(result.length.toString());
+    return result.toUpperCase();
   }
 
   getMacAddress() {
