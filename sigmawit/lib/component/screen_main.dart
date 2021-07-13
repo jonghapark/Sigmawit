@@ -130,6 +130,7 @@ class ScanscreenState extends State<Scanscreen> {
     if (cameraResult != '' && cameraResult != null) {
       print(cameraResult.toString());
       deviceList[index].firstPath = cameraResult.toString();
+      deviceList[index].secondPath = '';
       setState(() {});
       await DBHelper().updateImagePath(deviceList[index].getserialNumber(),
           cameraResult.toString(), 'first');
@@ -383,21 +384,23 @@ class ScanscreenState extends State<Scanscreen> {
   }
 
   // 권한 확인 함수 권한 없으면 권한 요청 화면 표시, 안드로이드만 상관 있음
-  _checkPermissions() {
-    // if (await Permission.location.request().isGranted) {
-    //   print('입장하냐?');
-    //   scan();
-    //   return;
-    // }
-    // Map<Permission, PermissionStatus> statuses =
-    //     await [Permission.location].request();
-    // if (statuses[Permission.location].toString() ==
-    //     "PermissionStatus.granted") {
-    //   //getCurrentLocation();
-    //   scan();
-    // }
-
-    scan();
+  _checkPermissions() async {
+    if (Platform.isAndroid) {
+      if (await Permission.location.request().isGranted) {
+        print('입장하냐?');
+        scan();
+        return;
+      }
+      Map<Permission, PermissionStatus> statuses =
+          await [Permission.location].request();
+      if (statuses[Permission.location].toString() ==
+          "PermissionStatus.granted") {
+        //getCurrentLocation();
+        scan();
+      }
+    } else {
+      scan();
+    }
   }
 
   //장치 화면에 출력하는 위젯 함수
@@ -849,6 +852,7 @@ class ScanscreenState extends State<Scanscreen> {
             //   print('이거임 : ' +
             //       scanResult.advertisementData.manufacturerData.toString());
             // }
+
             if (name != "Unknowns") {
               // print(name);
               // if (name.substring(0, 3) == 'IOT') {
@@ -1430,6 +1434,8 @@ class ScanscreenState extends State<Scanscreen> {
                       setState(() {
                         savedList.add(temp);
                       });
+
+                      await showMyDialog_finishAdd(context, temp);
                     }
 
                     Navigator.pop(context);
@@ -1684,6 +1690,65 @@ showMyDialog_Disconnect(BuildContext context) {
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
                               fontSize: 18),
+                          textAlign: TextAlign.center),
+                    ],
+                  ),
+                ),
+              ],
+            )),
+      );
+    },
+  );
+}
+
+showMyDialog_finishAdd(BuildContext context, String deviceName) {
+  bool manuallyClosed = false;
+  Future.delayed(Duration(seconds: 3)).then((_) {
+    if (!manuallyClosed) {
+      Navigator.of(context).pop();
+    }
+  });
+  return showDialog(
+    context: context,
+    builder: (context) {
+      return Dialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(30.0)),
+        backgroundColor: Color.fromRGBO(0x61, 0xB2, 0xD0, 1),
+        // elevation: 16.0,
+        child: Container(
+            width: MediaQuery.of(context).size.width / 3,
+            height: MediaQuery.of(context).size.height / 3.5,
+            padding: EdgeInsets.all(10.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Expanded(
+                  flex: 4,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Icon(
+                        Icons.check_box,
+                        color: Colors.white,
+                        size: MediaQuery.of(context).size.width / 5,
+                      ),
+                      Text(deviceName,
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 20)),
+                      Text("등록이 완료되었습니다.",
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 18),
+                          textAlign: TextAlign.center),
+                      Text("리스트에 추가 중 입니다.\n최대 1분의 시간이 소요됩니다. ",
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14),
                           textAlign: TextAlign.center),
                     ],
                   ),

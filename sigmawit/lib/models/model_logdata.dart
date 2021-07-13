@@ -129,8 +129,8 @@ class DBHelper {
     final db = await database;
     if (flag == 'first') {
       var res = await db.rawUpdate(
-          'UPDATE $TableName SET firstPath = ? WHERE mac = ?',
-          [path, macAddress]);
+          'UPDATE $TableName SET firstPath = ?, secondPath = ? WHERE mac = ?',
+          [path, '', macAddress]);
     } else if (flag == 'second') {
       var res = await db.rawUpdate(
           'UPDATE $TableName SET secondPath = ? WHERE mac = ?',
@@ -145,6 +145,14 @@ class DBHelper {
     var res = await db.rawUpdate(
         'UPDATE $TableName SET minTemp = ?, maxTemp = ?, minHumi = ?, maxHumi = ?, conditionflag = ? WHERE mac = ?',
         [minTemp, maxTemp, minHumi, maxHumi, conditionFlag, macAddress]);
+  }
+
+  //reset-Device
+  resetDevice(String macAddress) async {
+    final db = await database;
+    var res = await db.rawUpdate(
+        'UPDATE $TableName SET firstPath = ?, secondPath = ? WHERE mac = ?',
+        ['', '', macAddress]);
   }
 
   //Read All

@@ -98,8 +98,8 @@ class _DetailScreenState extends State<DetailScreen> {
             '°C / ' +
             filteredDatas[i].humidity.toString() +
             '% / ' +
-            DateFormat('yyyy-MM-dd - kk:mm')
-                .format(filteredDatas[i].timestamp) +
+            DateFormat('yyyy-MM-dd kk:mm')
+                .format(filteredDatas[i].timestamp.toLocal()) +
             '\n'));
       } else {
         result[listInx].add(pw.Text('0' +
@@ -109,8 +109,8 @@ class _DetailScreenState extends State<DetailScreen> {
             '°C / ' +
             filteredDatas[i].humidity.toString() +
             '% /' +
-            DateFormat('yyyy-MM-dd - kk:mm')
-                .format(filteredDatas[i].timestamp) +
+            DateFormat('yyyy-MM-dd kk:mm')
+                .format(filteredDatas[i].timestamp.toLocal()) +
             '\n'));
       }
     }
@@ -118,7 +118,7 @@ class _DetailScreenState extends State<DetailScreen> {
     return result;
   }
 
-  void downloadPdf() async {
+  void uploadPDF() async {
     // storage permission ask
     var status = await Permission.storage.status;
     if (!status.isGranted) {
@@ -544,7 +544,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                   // showUploadDialog(
                                   //     context, filteredDatas.length);
                                   // sendFetchData();
-                                  await downloadPdf();
+                                  await uploadPDF();
                                   // final pdf = pw.Document();
 
                                   // pdf.addPage(

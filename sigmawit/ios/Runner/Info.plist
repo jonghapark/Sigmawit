@@ -26,6 +26,10 @@
 	<string>블루투스를 항상 이용하시겠습니까?</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>블루투스를 이용하시겠습니까?</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>위치를 언제나 사용하시겠어요?</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>앱 사용시 위치를 사용하시겠어요?</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-central</string>
