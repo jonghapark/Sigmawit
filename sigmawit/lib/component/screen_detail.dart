@@ -82,6 +82,35 @@ class _DetailScreenState extends State<DetailScreen> {
     });
   }
 
+  List<List<pw.TableRow>> allRow() {
+    List<List<pw.TableRow>> result = [];
+
+    int idx = -1;
+    for (int i = 0; i < filteredDatas.length; i++) {
+      if (i % 40 == 0) {
+        print(i);
+        ++idx;
+        result.add([]);
+        result[idx].add(
+          tableRow(["No.  ", "Temperature(°C)", "Time"], TextStyle()),
+        );
+        print(result[idx].toString());
+      }
+
+      result[idx].add(
+        tableRow([
+          (i + 1).toString(),
+          filteredDatas[i].temperature.toString() + '°C',
+          DateFormat('yyyy-MM-dd kk:mm')
+                  .format(filteredDatas[i].timestamp.toLocal()) +
+              '\n'
+        ], TextStyle()),
+      );
+    }
+    print(result.length);
+    return result;
+  }
+
   List<List<pw.Text>> allText() {
     List<List<pw.Text>> result = [];
     int listInx = -1;
@@ -96,8 +125,9 @@ class _DetailScreenState extends State<DetailScreen> {
             '. ' +
             filteredDatas[i].temperature.toString() +
             '°C / ' +
-            filteredDatas[i].humidity.toString() +
-            '% / ' +
+            //TODO: 습도 제거
+            // filteredDatas[i].humidity.toString() +
+            // '% / ' +
             DateFormat('yyyy-MM-dd kk:mm')
                 .format(filteredDatas[i].timestamp.toLocal()) +
             '\n'));
@@ -107,8 +137,9 @@ class _DetailScreenState extends State<DetailScreen> {
             '. ' +
             filteredDatas[i].temperature.toString() +
             '°C / ' +
-            filteredDatas[i].humidity.toString() +
-            '% /' +
+            //TODO: 습도 제거
+            // filteredDatas[i].humidity.toString() +
+            // '% /' +
             DateFormat('yyyy-MM-dd kk:mm')
                 .format(filteredDatas[i].timestamp.toLocal()) +
             '\n'));
@@ -153,6 +184,91 @@ class _DetailScreenState extends State<DetailScreen> {
           )); //getting error here
         },
       ));
+    }
+
+    String now = DateTime.now().toString();
+    File pdfFile = File(filePath + '/report_' + now + '.pdf');
+    pdfFile.writeAsBytesSync(await pdf.save());
+    print('pdf 저장완료');
+
+    await Share.file('의약품 운송 결과', '/report_' + now + '.pdf',
+            await pdfFile.readAsBytes(), 'application/pdf',
+            text: '결과 보고서 파일입니다.')
+        .then((value) => print('pdf 공유완료'))
+        .onError((error, stackTrace) => print(error));
+  }
+
+  Widget textRow(List<String> titleList, TextStyle textStyle) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: titleList
+          .map(
+            (e) => Text(
+              e,
+              style: textStyle,
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  tableRow(List<String> attributes, TextStyle textStyle) {
+    return pw.TableRow(
+      children: attributes
+          .map(
+            (e) => pw.Text(
+              "  " + e,
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  void uploadPDF2() async {
+    // storage permission ask
+    var status = await Permission.storage.status;
+    if (!status.isGranted) {
+      await Permission.storage.request();
+    }
+
+    // the downloads folder path
+    final directory = await getExternalStorageDirectory();
+    final path = directory.path;
+    var filePath = path;
+    pdf = pw.Document();
+    await pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Center(
+              child: pw.Image(pw.MemoryImage(_imageFile),
+                  fit: pw.BoxFit.contain)); //getting error here
+        },
+      ),
+    );
+    List<List<pw.TableRow>> temp = allRow();
+
+    for (int i = 0; i < temp.length; i++) {
+      await pdf.addPage(pw.Page(
+          orientation: pw.PageOrientation.natural,
+          build: (context) => pw.Column(
+                mainAxisAlignment: pw.MainAxisAlignment.start,
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  pw.Text(
+                    'Log Datas',
+                    style: pw.TextStyle(fontSize: 20, color: PdfColors.grey),
+                  ),
+                  pw.Container(
+                    margin: pw.EdgeInsets.only(top: 8),
+                    color: PdfColors.white,
+                    child: pw.Table(
+                      border: pw.TableBorder.all(color: PdfColors.black),
+                      children: temp[i],
+                    ),
+                  )
+                ],
+              )));
     }
 
     String now = DateTime.now().toString();
@@ -544,7 +660,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                   // showUploadDialog(
                                   //     context, filteredDatas.length);
                                   // sendFetchData();
-                                  await uploadPDF();
+                                  await uploadPDF2();
                                   // final pdf = pw.Document();
 
                                   // pdf.addPage(
@@ -565,262 +681,310 @@ class _DetailScreenState extends State<DetailScreen> {
             body: Screenshot(
                 controller: screenshotController,
                 child: Container(
+                    height: MediaQuery.of(context).size.height * 1,
                     child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // DefaultTabController(
-                    //     length: 5,
-                    //     initialIndex: 1,
-                    //     child: Center(
-                    //         child: Padding(
-                    //             padding: const EdgeInsets.symmetric(horizontal: 1),
-                    //             child: Column(
-                    //                 mainAxisAlignment: MainAxisAlignment.center,
-                    //                 children: <Widget>[
-                    //                   Material(
-                    //                     child: TabBar(
-                    //                       onTap: (index) => {
-                    //                         setState(() {
-                    //                           currentType = toggleType(index);
-                    //                         })
-                    //                       },
-                    //                       indicatorColor: Colors.green,
-                    //                       tabs: [
-                    //                         Tab(
-                    //                           text: "Hour",
-                    //                         ),
-                    //                         Tab(
-                    //                           text: "Day",
-                    //                         ),
-                    //                         Tab(
-                    //                           text: "Week",
-                    //                         ),
-                    //                         Tab(
-                    //                           text: "Month",
-                    //                         ),
-                    //                         Tab(
-                    //                           text: "Year",
-                    //                         ),
-                    //                       ],
-                    //                       labelColor: Colors.black,
-                    //                       indicator: MaterialIndicator(
-                    //                         height: 5,
-                    //                         topLeftRadius: 8,
-                    //                         topRightRadius: 8,
-                    //                         horizontalPadding: 5,
-                    //                         tabPosition: TabPosition.bottom,
-                    //                       ),
-                    //                     ),
-                    //                   )
-                    //                 ])))),
-                    // Text(''),
-                    // dataFetchEnd == true
-                    //     ? Text(filteredDatas[filteredDatas.length - 1]
-                    //             .timestamp
-                    //             .toString()
-                    //             .substring(0, 19) +
-                    //         ' ~ ' +
-                    //         filteredDatas[0]
-                    //             .timestamp
-                    //             .toString()
-                    //             .substring(0, 19))
-                    //     : Text(''),
-                    Column(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        dataFetchEnd == false
-                            ? Center(
-                                // height:
-                                //     MediaQuery.of(context).size.height * 0.85,
-                                child: Container(
-                                padding: EdgeInsets.all(4),
-                                height:
-                                    MediaQuery.of(context).size.height * 0.85,
-                                child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        log,
-                                        style: thinTextStyle,
-                                      ),
-                                      Text(''),
-                                      log == '데이터 가져오는 중'
-                                          ? CircularProgressIndicator(
-                                              backgroundColor: Colors.black26,
-                                            )
-                                          : SizedBox(),
-                                    ]),
-                              ))
-                            : Container(
-                                padding: EdgeInsets.all(4),
-                                height:
-                                    MediaQuery.of(context).size.height * 0.85,
-                                child: Column(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceEvenly,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text('디바이스 명 : ' +
-                                                'Sensor_' +
-                                                widget.currentDevice.peripheral
-                                                    .identifier
-                                                    .substring(9, 11) +
-                                                widget.currentDevice.peripheral
-                                                    .identifier
-                                                    .substring(12, 14) +
-                                                widget.currentDevice.peripheral
-                                                    .identifier
-                                                    .substring(15, 17)),
-                                            Text('Mac Address : ' +
-                                                widget.currentDevice.peripheral
-                                                    .identifier),
-                                          ],
-                                        ),
-                                        Image(
-                                          image: AssetImage(
-                                              'images/background2.png'),
-                                          fit: BoxFit.contain,
-                                          width: MediaQuery.of(context)
-                                                  .size
-                                                  .width *
-                                              0.3,
-                                          height: MediaQuery.of(context)
-                                                  .size
-                                                  .width *
-                                              0.10,
-                                        ),
-                                      ],
-                                    ),
-                                    Column(
-                                      children: [
-                                        SfCartesianChart(
-                                            primaryYAxis: NumericAxis(
-                                                interval: 10,
-                                                minimum: 0,
-                                                plotBands: <PlotBand>[
-                                                  PlotBand(
-                                                    text: '적정 온도(2°C ~ 8°C)',
-                                                    textStyle: TextStyle(
-                                                        color: Color.fromRGBO(
-                                                            0, 0, 0, 0.6),
-                                                        fontSize: 12,
-                                                        fontWeight:
-                                                            FontWeight.bold),
-                                                    isVisible: true,
-                                                    start: 2,
-                                                    end: 8,
-                                                    borderWidth: 2,
-                                                    color: Color.fromRGBO(
-                                                        255, 255, 255, 1.0),
-                                                    borderColor: Colors.red,
-                                                  )
-                                                ]),
-                                            primaryXAxis: DateTimeAxis(
-                                                labelRotation: 5,
-                                                maximumLabels: 5,
-                                                // Set name for x axis in order to use it in the callback event.
-                                                name: 'primaryXAxis',
-                                                intervalType: currentType,
-                                                majorGridLines:
-                                                    MajorGridLines(width: 1)),
-                                            // primaryYAxis:
-                                            //     NumericAxis(interval: 1, maximum: 30),
-                                            // Chart title
-                                            title: ChartTitle(text: '온도 그래프'),
-                                            // Enable legend
-                                            legend: Legend(isVisible: false),
-                                            // Enable tooltip
-                                            tooltipBehavior:
-                                                TooltipBehavior(enable: true),
-                                            series: <
-                                                ChartSeries<LogData, DateTime>>[
-                                              LineSeries<LogData, DateTime>(
-                                                  dataSource: filteredDatas,
-                                                  xValueMapper:
-                                                      (LogData data, _) {
-                                                    return data.timestamp;
-                                                  },
-                                                  yValueMapper:
-                                                      (LogData data, _) =>
-                                                          data.temperature,
-                                                  name: '온도',
-                                                  // Enable data label
-                                                  dataLabelSettings:
-                                                      DataLabelSettings(
-                                                          isVisible: false))
-                                            ]),
-                                        Text('최저 온도 : ' +
-                                            min.toString() +
-                                            '°C    / ' +
-                                            '최고 온도 : ' +
-                                            max.toString() +
-                                            '°C\n'),
-                                        Text('시작 시간 : ' +
-                                            DateFormat('yyyy-MM-dd HH:mm:ss')
-                                                .format(minTime)),
-                                        Text('종료 시간 : ' +
-                                            DateFormat('yyyy-MM-dd HH:mm:ss')
-                                                .format(maxTime)),
-                                        Text('총 데이터 (1분 단위) : ' +
-                                            count.toString() +
-                                            '개'),
-                                      ],
-                                      // 1분단위 세시간 -> 180개 -> 3분단위 -> 60개 -> 3분단위 100 -> 300 분 5시간 ?
-                                    ),
-                                    Column(
+                        // DefaultTabController(
+                        //     length: 5,
+                        //     initialIndex: 1,
+                        //     child: Center(
+                        //         child: Padding(
+                        //             padding: const EdgeInsets.symmetric(horizontal: 1),
+                        //             child: Column(
+                        //                 mainAxisAlignment: MainAxisAlignment.center,
+                        //                 children: <Widget>[
+                        //                   Material(
+                        //                     child: TabBar(
+                        //                       onTap: (index) => {
+                        //                         setState(() {
+                        //                           currentType = toggleType(index);
+                        //                         })
+                        //                       },
+                        //                       indicatorColor: Colors.green,
+                        //                       tabs: [
+                        //                         Tab(
+                        //                           text: "Hour",
+                        //                         ),
+                        //                         Tab(
+                        //                           text: "Day",
+                        //                         ),
+                        //                         Tab(
+                        //                           text: "Week",
+                        //                         ),
+                        //                         Tab(
+                        //                           text: "Month",
+                        //                         ),
+                        //                         Tab(
+                        //                           text: "Year",
+                        //                         ),
+                        //                       ],
+                        //                       labelColor: Colors.black,
+                        //                       indicator: MaterialIndicator(
+                        //                         height: 5,
+                        //                         topLeftRadius: 8,
+                        //                         topRightRadius: 8,
+                        //                         horizontalPadding: 5,
+                        //                         tabPosition: TabPosition.bottom,
+                        //                       ),
+                        //                     ),
+                        //                   )
+                        //                 ])))),
+                        // Text(''),
+                        // dataFetchEnd == true
+                        //     ? Text(filteredDatas[filteredDatas.length - 1]
+                        //             .timestamp
+                        //             .toString()
+                        //             .substring(0, 19) +
+                        //         ' ~ ' +
+                        //         filteredDatas[0]
+                        //             .timestamp
+                        //             .toString()
+                        //             .substring(0, 19))
+                        //     : Text(''),
+                        Column(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            dataFetchEnd == false
+                                ? Center(
+                                    // height:
+                                    //     MediaQuery.of(context).size.height * 0.85,
+                                    child: Container(
+                                    padding: EdgeInsets.all(4),
+                                    height: MediaQuery.of(context).size.height *
+                                        0.85,
+                                    child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            log,
+                                            style: thinTextStyle,
+                                          ),
+                                          Text(''),
+                                          log == '데이터 가져오는 중'
+                                              ? CircularProgressIndicator(
+                                                  backgroundColor:
+                                                      Colors.black26,
+                                                )
+                                              : SizedBox(),
+                                        ]),
+                                  ))
+                                : Container(
+                                    padding: EdgeInsets.all(4),
+                                    height: MediaQuery.of(context).size.height *
+                                        0.85,
+                                    child: Column(
                                       mainAxisAlignment:
                                           MainAxisAlignment.spaceEvenly,
                                       children: [
-                                        Text(
-                                          '[ 거래 명세서 ]\n',
-                                        ),
                                         Row(
                                           mainAxisAlignment:
-                                              MainAxisAlignment.spaceAround,
+                                              MainAxisAlignment.spaceBetween,
                                           children: [
-                                            Image.file(
-                                              File(widget
-                                                  .currentDevice.firstPath),
-                                              // width: MediaQuery.of(context)
-                                              //         .size
-                                              //         .width *
-                                              //     0.35,
+                                            Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text('디바이스 명 : ' +
+                                                    'Sensor_' +
+                                                    widget.currentDevice
+                                                        .peripheral.identifier
+                                                        .substring(9, 11) +
+                                                    widget.currentDevice
+                                                        .peripheral.identifier
+                                                        .substring(12, 14) +
+                                                    widget.currentDevice
+                                                        .peripheral.identifier
+                                                        .substring(15, 17)),
+                                                Text('Mac Address : ' +
+                                                    widget.currentDevice
+                                                        .peripheral.identifier),
+                                              ],
+                                            ),
+                                            Image(
+                                              image: AssetImage(
+                                                  'images/background2.png'),
+                                              fit: BoxFit.contain,
+                                              width: MediaQuery.of(context)
+                                                      .size
+                                                      .width *
+                                                  0.3,
                                               height: MediaQuery.of(context)
                                                       .size
-                                                      .height *
-                                                  0.3,
-                                              fit: BoxFit.contain,
+                                                      .width *
+                                                  0.10,
                                             ),
-                                            Image.file(
-                                                File(widget
-                                                    .currentDevice.secondPath),
-                                                // width: MediaQuery.of(context)
-                                                //         .size
-                                                //         .width *
-                                                //     0.35,
-                                                height: MediaQuery.of(context)
-                                                        .size
-                                                        .height *
-                                                    0.3)
                                           ],
                                         ),
+                                        Column(
+                                          children: [
+                                            SfCartesianChart(
+                                                primaryYAxis: NumericAxis(
+                                                    interval: 10,
+                                                    minimum: 0,
+                                                    plotBands: <PlotBand>[
+                                                      PlotBand(
+                                                        horizontalTextAlignment:
+                                                            TextAnchor.end,
+                                                        shouldRenderAboveSeries:
+                                                            false,
+                                                        text: '4°C',
+                                                        textStyle: TextStyle(
+                                                            color: Colors.red,
+                                                            fontSize: 12,
+                                                            fontWeight:
+                                                                FontWeight
+                                                                    .bold),
+                                                        isVisible: true,
+                                                        start: 4,
+                                                        end: 4,
+                                                        borderWidth: 2,
+                                                        // color: Colors.red,
+                                                        // opacity: 0.3,
+                                                        // color: Color.fromRGBO(
+                                                        //     255, 255, 255, 1.0),
+                                                        borderColor: Colors.red,
+                                                      ),
+                                                      PlotBand(
+                                                        horizontalTextAlignment:
+                                                            TextAnchor.end,
+                                                        shouldRenderAboveSeries:
+                                                            false,
+                                                        text: '28°C',
+                                                        textStyle: TextStyle(
+                                                            color: Colors.red,
+                                                            fontSize: 12,
+                                                            fontWeight:
+                                                                FontWeight
+                                                                    .bold),
+                                                        isVisible: true,
+                                                        start: 28,
+                                                        end: 28,
+                                                        borderWidth: 2,
+                                                        // color: Colors.grey,
+                                                        // opacity: 0.3
+                                                        // color: Color.fromRGBO(
+                                                        //     255, 255, 255, 1.0),
+                                                        borderColor: Colors.red,
+                                                      )
+                                                    ]),
+                                                primaryXAxis: DateTimeAxis(
+                                                    labelRotation: 5,
+                                                    maximumLabels: 5,
+                                                    // Set name for x axis in order to use it in the callback event.
+                                                    name: 'primaryXAxis',
+                                                    intervalType: currentType,
+                                                    majorGridLines:
+                                                        MajorGridLines(
+                                                            width: 1)),
+                                                // primaryYAxis:
+                                                //     NumericAxis(interval: 1, maximum: 30),
+                                                // Chart title
+                                                title:
+                                                    ChartTitle(text: '온도 그래프'),
+                                                // Enable legend
+                                                legend:
+                                                    Legend(isVisible: false),
+                                                // Enable tooltip
+                                                tooltipBehavior:
+                                                    TooltipBehavior(
+                                                        enable: true),
+                                                series: <
+                                                    ChartSeries<LogData,
+                                                        DateTime>>[
+                                                  LineSeries<LogData, DateTime>(
+                                                      dataSource: filteredDatas,
+                                                      xValueMapper:
+                                                          (LogData data, _) {
+                                                        return data.timestamp;
+                                                      },
+                                                      yValueMapper:
+                                                          (LogData data, _) =>
+                                                              data.temperature,
+                                                      name: '온도',
+                                                      // Enable data label
+                                                      dataLabelSettings:
+                                                          DataLabelSettings(
+                                                              isVisible: false))
+                                                ]),
+                                            Text('최저 온도 : ' +
+                                                min.toString() +
+                                                '°C    / ' +
+                                                '최고 온도 : ' +
+                                                max.toString() +
+                                                '°C\n'),
+                                            Text('시작 시간 : ' +
+                                                DateFormat(
+                                                        'yyyy-MM-dd HH:mm:ss')
+                                                    .format(minTime)),
+                                            Text('종료 시간 : ' +
+                                                DateFormat(
+                                                        'yyyy-MM-dd HH:mm:ss')
+                                                    .format(maxTime)),
+                                            Text('총 데이터 (1분 단위) : ' +
+                                                count.toString() +
+                                                '개'),
+                                          ],
+                                          // 1분단위 세시간 -> 180개 -> 3분단위 -> 60개 -> 3분단위 100 -> 300 분 5시간 ?
+                                        ),
+                                        Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceEvenly,
+                                          children: [
+                                            Text(
+                                              '[ 거래 명세서 ]\n',
+                                            ),
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.spaceAround,
+                                              children: [
+                                                Column(
+                                                  children: [
+                                                    Text('시작 이미지'),
+                                                    Image.file(
+                                                      File(widget.currentDevice
+                                                          .firstPath),
+                                                      // width: MediaQuery.of(context)
+                                                      //         .size
+                                                      //         .width *
+                                                      //     0.35,
+                                                      height:
+                                                          MediaQuery.of(context)
+                                                                  .size
+                                                                  .height *
+                                                              0.28,
+                                                      fit: BoxFit.contain,
+                                                    ),
+                                                  ],
+                                                ),
+                                                Column(children: [
+                                                  Text('종료 이미지'),
+                                                  Image.file(
+                                                      File(widget.currentDevice
+                                                          .secondPath),
+                                                      // width: MediaQuery.of(context)
+                                                      //         .size
+                                                      //         .width *
+                                                      //     0.35,
+                                                      height:
+                                                          MediaQuery.of(context)
+                                                                  .size
+                                                                  .height *
+                                                              0.28)
+                                                ]),
+                                              ],
+                                            ),
+                                          ],
+                                        )
                                       ],
-                                    )
-                                  ],
-                                ))
+                                    ))
+                          ],
+                        )
                       ],
-                    )
-                  ],
-                )))));
+                    )))));
   }
 }
 

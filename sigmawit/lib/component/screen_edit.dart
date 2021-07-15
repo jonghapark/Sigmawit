@@ -17,6 +17,7 @@ import 'package:camera/camera.dart';
 import '../component/screen_camera.dart';
 import 'dart:io';
 import 'package:numberpicker/numberpicker.dart';
+import 'package:flutter/services.dart';
 
 // 데이터는 계속
 // 전체 데이터 시작부터 종료까지
@@ -42,12 +43,12 @@ class _EditScreenState extends State<EditScreen> {
   BleDeviceItem selectedDevice;
   TextEditingController _textFieldController;
 
-  int _minTemp = 2;
-  int _maxTemp = 8;
-  int _minHumi = 2;
-  int _maxHumi = 8;
-  bool isSwitchedTemp = false;
-  bool isSwitchedHumi = false;
+  int _minTemp = 4;
+  int _maxTemp = 28;
+  int _minHumi = 4;
+  int _maxHumi = 28;
+  bool isSwitchedTemp = true;
+  bool isSwitchedHumi = true;
 
   loc.Location location = new loc.Location();
   loc.LocationData currentLocation;
@@ -57,10 +58,10 @@ class _EditScreenState extends State<EditScreen> {
 
   @override
   void initState() {
-    _minTemp = 2;
-    _maxTemp = 8;
-    _minHumi = 2;
-    _maxHumi = 8;
+    _minTemp = 4;
+    _maxTemp = 28;
+    _minHumi = 4;
+    _maxHumi = 28;
     selectedDevice = widget.currentDevice;
 
     super.initState();
@@ -111,10 +112,10 @@ class _EditScreenState extends State<EditScreen> {
                       deviceName: codeDialog,
                       isDesiredConditionOn: 'false',
                       macAddress: selectedDevice.getserialNumber(),
-                      minTemper: 2,
-                      maxTemper: 8,
-                      minHumidity: 2,
-                      maxHumidity: 8,
+                      minTemper: 4,
+                      maxTemper: 28,
+                      minHumidity: 4,
+                      maxHumidity: 28,
                       firstPath: '',
                       secondPath: '',
                     ));
@@ -331,6 +332,7 @@ class _EditScreenState extends State<EditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     return MaterialApp(
         builder: (context, child) {
           return MediaQuery(
@@ -606,7 +608,7 @@ class _EditScreenState extends State<EditScreen> {
                                     children: [
                                       Text('온도 조건 : ',
                                           style: whiteBoldTextStyle),
-                                      Text('온도(최저): 2°C / 온도(최고): 8°C ',
+                                      Text('온도(최저): 4°C / 온도(최고): 28°C ',
                                           style: smallWhiteTextStyle),
                                       // Text('습도(최저): _ _%, 습도(최고): _ _%',
                                       //     style: smallWhiteTextStyle)
