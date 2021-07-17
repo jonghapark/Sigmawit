@@ -1873,7 +1873,7 @@ showMyDialog_Disconnect(BuildContext context) {
                         color: Colors.white,
                         size: MediaQuery.of(context).size.width / 5,
                       ),
-                      Text("연결이 끊어졌습니다 !",
+                      Text("데이터 전송이 완료되었습니다 !",
                           style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
@@ -2081,11 +2081,17 @@ showMyDialog_Connecting(BuildContext context) {
                         color: Colors.white,
                         size: MediaQuery.of(context).size.width / 5,
                       ),
-                      Text("기기와 연결중입니다 !",
+                      Text("데이터 전송을 시작합니다 !",
                           style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
                               fontSize: 18),
+                          textAlign: TextAlign.center),
+                      Text("로딩이 되지 않으면 다시 눌러주세요.",
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14),
                           textAlign: TextAlign.center),
                     ],
                   ),

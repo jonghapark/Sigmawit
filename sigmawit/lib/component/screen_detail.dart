@@ -45,6 +45,7 @@ class _DetailScreenState extends State<DetailScreen> {
   List<LogData> fetchDatas = [];
   List<LogData> filteredDatas = [];
   int count = 0;
+  int unConditionalCount = 0;
   double min = 100;
   double max = -100;
   DateTime minTime;
@@ -82,32 +83,40 @@ class _DetailScreenState extends State<DetailScreen> {
     });
   }
 
+  String innerCondition(int min, int max, double temp) {
+    if (temp <= max && temp >= min)
+      return 'Good';
+    else
+      return 'Bad';
+  }
+
   List<List<pw.TableRow>> allRow() {
     List<List<pw.TableRow>> result = [];
 
     int idx = -1;
     for (int i = 0; i < filteredDatas.length; i++) {
       if (i % 40 == 0) {
-        print(i);
         ++idx;
         result.add([]);
         result[idx].add(
-          tableRow(["No.  ", "Temperature(°C)", "Time"], TextStyle()),
+          tableRowDatas(["No.  ", "Temperature(°C)", "Time", "Condition  "],
+              TextStyle(), filteredDatas[i].temperature),
         );
-        print(result[idx].toString());
       }
 
       result[idx].add(
-        tableRow([
+        tableRowDatas([
           (i + 1).toString(),
           filteredDatas[i].temperature.toString() + '°C',
           DateFormat('yyyy-MM-dd kk:mm')
                   .format(filteredDatas[i].timestamp.toLocal()) +
-              '\n'
-        ], TextStyle()),
+              '\n',
+          //TODO: min , max 변경
+          innerCondition(4, 28, filteredDatas[i].temperature)
+        ], TextStyle(), filteredDatas[i].temperature),
       );
     }
-    print(result.length);
+
     return result;
   }
 
@@ -224,9 +233,43 @@ class _DetailScreenState extends State<DetailScreen> {
     );
   }
 
+  tableRowDatas(List<String> attributes, TextStyle textStyle, double temper) {
+    List<pw.Text> temp = [];
+    if (attributes[3] == 'Condition  ') {
+      return pw.TableRow(
+        children: attributes
+            .map(
+              (e) => pw.Text(
+                "  " + e,
+              ),
+            )
+            .toList(),
+      );
+    } else {
+      temp = attributes
+          .map(
+            (e) => pw.Text(
+              "  " + e,
+            ),
+          )
+          .toList();
+
+      if (attributes[3] == 'Good') {
+        return pw.TableRow(children: temp);
+      } else {
+        temp.removeLast();
+        temp.add(pw.Text("  " + attributes[3],
+            style: pw.TextStyle(color: PdfColors.red)));
+        return pw.TableRow(children: temp);
+      }
+    }
+  }
+
   void uploadPDF2() async {
     // storage permission ask
+
     var status = await Permission.storage.status;
+
     if (!status.isGranted) {
       await Permission.storage.request();
     }
@@ -535,21 +578,22 @@ class _DetailScreenState extends State<DetailScreen> {
           print('총 몇개? ' + count.toString());
           print('Read End !');
           List<LogData> tmp = [];
-          DateTime oneDayAgo =
-              DateTime.now().subtract(Duration(days: 1, hours: 1));
+
           for (int i = 0; i < fetchDatas.length; i++) {
-            if (fetchDatas[i].timestamp.isAfter(oneDayAgo)) {
-              tmp.add(fetchDatas[i]);
-              if (fetchDatas[i].temperature < min) {
-                setState(() {
-                  min = fetchDatas[i].temperature;
-                });
-              }
-              if (fetchDatas[i].temperature > max) {
-                setState(() {
-                  max = fetchDatas[i].temperature;
-                });
-              }
+            if (fetchDatas[i].temperature < 4 ||
+                fetchDatas[i].temperature > 28) {
+              unConditionalCount++;
+            }
+            tmp.add(fetchDatas[i]);
+            if (fetchDatas[i].temperature < min) {
+              setState(() {
+                min = fetchDatas[i].temperature;
+              });
+            }
+            if (fetchDatas[i].temperature > max) {
+              setState(() {
+                max = fetchDatas[i].temperature;
+              });
             }
           }
           setState(() {
@@ -612,6 +656,7 @@ class _DetailScreenState extends State<DetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scaffoldKey = GlobalKey<ScaffoldState>();
     return MaterialApp(
         builder: (context, child) {
           return MediaQuery(
@@ -627,6 +672,7 @@ class _DetailScreenState extends State<DetailScreen> {
           //canvasColor: Colors.transparent,
         ),
         home: Scaffold(
+            key: scaffoldKey,
             appBar: AppBar(
               // backgroundColor: Color.fromARGB(22, 27, 32, 1),
               title: Row(
@@ -656,10 +702,18 @@ class _DetailScreenState extends State<DetailScreen> {
                               new IconButton(
                                 icon: new Icon(Icons.share, size: 30),
                                 onPressed: () async {
+                                  scaffoldKey.currentState
+                                      .showSnackBar(SnackBar(
+                                    duration: Duration(seconds: 2),
+                                    content: Text('운송 결과 PDF를 생성중입니다.',
+                                        style: TextStyle(fontSize: 18)),
+                                  ));
+
                                   await takeScreenshot();
                                   // showUploadDialog(
                                   //     context, filteredDatas.length);
                                   // sendFetchData();
+
                                   await uploadPDF2();
                                   // final pdf = pw.Document();
 
@@ -880,8 +934,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                                     majorGridLines:
                                                         MajorGridLines(
                                                             width: 1)),
-                                                // primaryYAxis:
-                                                //     NumericAxis(interval: 1, maximum: 30),
+
                                                 // Chart title
                                                 title:
                                                     ChartTitle(text: '온도 그래프'),
@@ -935,7 +988,15 @@ class _DetailScreenState extends State<DetailScreen> {
                                               MainAxisAlignment.spaceEvenly,
                                           children: [
                                             Text(
-                                              '[ 거래 명세서 ]\n',
+                                              '총 온도 이탈 시간 : ' +
+                                                  unConditionalCount
+                                                      .toString() +
+                                                  '분 (' +
+                                                  unConditionalCount
+                                                      .toString() +
+                                                  '개)\n',
+                                              style: TextStyle(
+                                                  fontWeight: FontWeight.w900),
                                             ),
                                             Row(
                                               mainAxisAlignment:
