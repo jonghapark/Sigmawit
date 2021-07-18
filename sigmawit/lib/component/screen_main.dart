@@ -51,6 +51,7 @@ class ScanscreenState extends State<Scanscreen> {
   Map<String, String> idMapper;
   // double width;
   TextEditingController _textFieldController;
+  String currentState = '';
 
   String firstImagePath = '';
   String secondImagePath = '';
@@ -204,6 +205,9 @@ class ScanscreenState extends State<Scanscreen> {
       (notifyResult) async {
         // print('혹시 이거임 ?' + notifyResult.toString());
         if (notifyResult[10] == 0x0a) {
+          // FIXME: 기존 데이터 삭제 후 ( 다이얼로그 종료 ) -> ( 운송 시작 다이얼로그 ) 변경
+
+          await showMyDialog_StartTransport(context);
           Navigator.of(context).pop();
         }
         if (notifyResult[10] == 0x03) {
@@ -1161,9 +1165,11 @@ class ScanscreenState extends State<Scanscreen> {
         .observeConnectionState(emitCurrentValue: false)
         .listen((connectionState) {
       // 연결상태가 변경되면 해당 루틴을 탐.
+      print(currentState);
       switch (connectionState) {
         case PeripheralConnectionState.connected:
           {
+            currentState = 'connected';
             //연결됨
             print('연결 완료 !');
             _curPeripheral = peripheral;
@@ -1201,18 +1207,22 @@ class ScanscreenState extends State<Scanscreen> {
         case PeripheralConnectionState.connecting:
           {
             deviceList[index].connectionState = 'connecting';
+
             showMyDialog_Connecting(context);
+
             print('연결중입니당!');
+            currentState = 'connecting';
             setBLEState('<연결 중>');
           } //연결중
           break;
         case PeripheralConnectionState.disconnected:
           {
-            showMyDialog_Disconnect(context);
+            if (currentState == 'connecting') showMyDialog_Disconnect(context);
             //해제됨
             _connected = false;
             print("${peripheral.name} has DISCONNECTED");
-            _stopMonitoringTemperature();
+            //TODO: 일단 주석 !
+            // _stopMonitoringTemperature();
             deviceList[index].connectionState = 'scan';
             setBLEState('<연결 종료>');
             if (processState == 2) {
@@ -1412,10 +1422,11 @@ class ScanscreenState extends State<Scanscreen> {
                                   onPressed: () {
                                     if (flag == 'first') {
                                       takePicture(context, index);
-                                      Navigator.of(context).pop();
+
+                                      // Navigator.of(context).pop();
                                     } else if (flag == 'second') {
                                       takePicture2(context, index);
-                                      Navigator.of(context).pop();
+                                      // Navigator.of(context).pop();
                                     }
                                   },
                                   child: Container(
@@ -1575,8 +1586,8 @@ class ScanscreenState extends State<Scanscreen> {
                           deviceName: '',
                           isDesiredConditionOn: 'false',
                           macAddress: temp,
-                          minTemper: 2,
-                          maxTemper: 8,
+                          minTemper: 4,
+                          maxTemper: 28,
                           minHumidity: 2,
                           maxHumidity: 8,
                           firstPath: '',
@@ -1873,7 +1884,13 @@ showMyDialog_Disconnect(BuildContext context) {
                         color: Colors.white,
                         size: MediaQuery.of(context).size.width / 5,
                       ),
-                      Text("데이터 전송이 완료되었습니다 !",
+                      Text("재연결이 필요합니다.",
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 18),
+                          textAlign: TextAlign.center),
+                      Text("다시 시도해 주세요 !",
                           style: TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.w600,
@@ -2093,6 +2110,60 @@ showMyDialog_Connecting(BuildContext context) {
                               fontWeight: FontWeight.w600,
                               fontSize: 14),
                           textAlign: TextAlign.center),
+                    ],
+                  ),
+                ),
+              ],
+            )),
+      );
+    },
+  );
+}
+
+showMyDialog_StartTransport(BuildContext context) {
+  bool manuallyClosed = false;
+  Future.delayed(Duration(seconds: 2)).then((_) {
+    if (!manuallyClosed) {
+      Navigator.of(context).pop();
+    }
+  });
+  return showDialog(
+    context: context,
+    builder: (context) {
+      return Dialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(30.0)),
+        backgroundColor: Color.fromRGBO(0x61, 0xB2, 0xD0, 1),
+        elevation: 16.0,
+        child: Container(
+            width: MediaQuery.of(context).size.width / 3,
+            height: MediaQuery.of(context).size.height / 4,
+            padding: EdgeInsets.all(10.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Expanded(
+                  flex: 4,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Icon(
+                        Icons.check_box,
+                        color: Colors.white,
+                        size: MediaQuery.of(context).size.width / 5,
+                      ),
+                      Text("운송을 시작합니다. ",
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 20),
+                          textAlign: TextAlign.center),
+                      // Text("안전한 운행되세요.",
+                      //     style: TextStyle(
+                      //         color: Colors.white,
+                      //         fontWeight: FontWeight.w600,
+                      //         fontSize: 14),
+                      //     textAlign: TextAlign.center),
                     ],
                   ),
                 ),

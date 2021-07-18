@@ -98,7 +98,7 @@ class DBHelper {
   }
 
   //Read
-  getDevice(String macAddress) async {
+  Future<DeviceInfo> getDevice(String macAddress) async {
     final db = await database;
     print('이거 검색함 ' + macAddress.toUpperCase());
     var res = await db.rawQuery(

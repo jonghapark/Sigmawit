@@ -47,8 +47,8 @@ class _EditScreenState extends State<EditScreen> {
   int _maxTemp = 28;
   int _minHumi = 4;
   int _maxHumi = 28;
-  bool isSwitchedTemp = true;
   bool isSwitchedHumi = true;
+  bool isSwitchedTemp = true;
 
   loc.Location location = new loc.Location();
   loc.LocationData currentLocation;
@@ -175,12 +175,13 @@ class _EditScreenState extends State<EditScreen> {
             return AlertDialog(
               title: Text('적정 온도 설정'),
               content: Container(
-                height: MediaQuery.of(context).size.height * 0.6,
+                height: MediaQuery.of(context).size.height * 0.65,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: <Widget>[
                     SizedBox(height: 16),
                     Divider(color: Colors.grey, height: 32),
+                    // 1번째 온도 4~ 28 도
                     Text('최저 온도 (°C)',
                         style: Theme.of(context).textTheme.headline6),
                     NumberPicker(
@@ -204,10 +205,10 @@ class _EditScreenState extends State<EditScreen> {
                       onChanged: (value) => setState(() => _maxTemp = value),
                     ),
                     Switch(
-                      value: isSwitchedTemp,
+                      value: !isSwitchedHumi,
                       onChanged: (value) {
                         setState(() {
-                          isSwitchedTemp = value;
+                          isSwitchedHumi = !value;
                         });
                       },
                       activeTrackColor: Colors.lightBlueAccent,
@@ -215,38 +216,39 @@ class _EditScreenState extends State<EditScreen> {
                     ),
                     Divider(color: Colors.grey, height: 32),
                     SizedBox(height: 16),
-                    // Text('최저 온도 (%)',
-                    //     style: Theme.of(context).textTheme.headline6),
-                    // NumberPicker(
-                    //   axis: Axis.horizontal,
-                    //   value: _minHumi,
-                    //   minValue: -20,
-                    //   maxValue: 40,
-                    //   step: 1,
-                    //   haptics: true,
-                    //   onChanged: (value) => setState(() => _minHumi = value),
-                    // ),
-                    // Text('최고 온도 (%)',
-                    //     style: Theme.of(context).textTheme.headline6),
-                    // NumberPicker(
-                    //   axis: Axis.horizontal,
-                    //   value: _maxHumi,
-                    //   minValue: -20,
-                    //   maxValue: 40,
-                    //   step: 1,
-                    //   haptics: true,
-                    //   onChanged: (value) => setState(() => _maxHumi = value),
-                    // ),
-                    // Switch(
-                    //   value: tempHumi,
-                    //   onChanged: (value) {
-                    //     setState(() {
-                    //       tempHumi = value;
-                    //     });
-                    //   },
-                    //   activeTrackColor: Colors.lightBlueAccent,
-                    //   activeColor: Colors.blue,
-                    // ),
+                    // 2번째 온도 2~ 8 도
+                    Text('최저 온도 (%)',
+                        style: Theme.of(context).textTheme.headline6),
+                    NumberPicker(
+                      axis: Axis.horizontal,
+                      value: _minHumi,
+                      minValue: -20,
+                      maxValue: 40,
+                      step: 1,
+                      haptics: true,
+                      onChanged: (value) => setState(() => _minHumi = value),
+                    ),
+                    Text('최고 온도 (%)',
+                        style: Theme.of(context).textTheme.headline6),
+                    NumberPicker(
+                      axis: Axis.horizontal,
+                      value: _maxHumi,
+                      minValue: -20,
+                      maxValue: 40,
+                      step: 1,
+                      haptics: true,
+                      onChanged: (value) => setState(() => _maxHumi = value),
+                    ),
+                    Switch(
+                      value: isSwitchedHumi,
+                      onChanged: (value) {
+                        setState(() {
+                          isSwitchedHumi = value;
+                        });
+                      },
+                      activeTrackColor: Colors.lightBlueAccent,
+                      activeColor: Colors.blue,
+                    ),
                   ],
                 ),
               ),
@@ -269,10 +271,11 @@ class _EditScreenState extends State<EditScreen> {
                         _maxTemp,
                         _minHumi,
                         _maxHumi,
-                        isSwitchedTemp == false ? 'false' : 'true',
+                        isSwitchedHumi == true ? 'true' : 'false',
                       );
-                      Navigator.pop(context);
                     });
+
+                    Navigator.pop(context);
                   },
                 ),
               ],
@@ -608,10 +611,53 @@ class _EditScreenState extends State<EditScreen> {
                                     children: [
                                       Text('온도 조건 : ',
                                           style: whiteBoldTextStyle),
-                                      Text('온도(최저): 4°C / 온도(최고): 28°C ',
-                                          style: smallWhiteTextStyle),
-                                      // Text('습도(최저): _ _%, 습도(최고): _ _%',
-                                      //     style: smallWhiteTextStyle)
+                                      FutureBuilder(
+                                          future: DBHelper().getDevice(widget
+                                              .currentDevice
+                                              .getserialNumber()),
+                                          builder: (BuildContext context,
+                                              AsyncSnapshot<DeviceInfo>
+                                                  snapshot) {
+                                            if (snapshot.hasData) {
+                                              int minTemp1 =
+                                                  snapshot.data.minTemper;
+                                              int maxTemp1 =
+                                                  snapshot.data.maxTemper;
+                                              int minTemp2 =
+                                                  snapshot.data.minHumidity;
+                                              int maxTemp2 =
+                                                  snapshot.data.maxHumidity;
+                                              String isTemp2 = snapshot
+                                                  .data.isDesiredConditionOn;
+                                              // setState(() {
+                                              _minTemp = minTemp1;
+                                              _maxTemp = maxTemp1;
+                                              _minHumi = minTemp2;
+                                              _maxHumi = maxTemp2;
+                                              if (isTemp2 == 'false') {
+                                                // isSwitchedTemp = true;
+                                                isSwitchedHumi = false;
+                                              } else {
+                                                // isSwitchedTemp = false;
+                                                isSwitchedHumi = true;
+                                              }
+                                              // });
+
+                                              if (isTemp2 == 'false') {
+                                                return Text(
+                                                    '온도(최저): $minTemp1°C / 온도(최고): $maxTemp1°C ',
+                                                    style: smallWhiteTextStyle);
+                                              } else {
+                                                return Text(
+                                                    '온도(최저): $minTemp2°C / 온도(최고): $maxTemp2°C ',
+                                                    style: smallWhiteTextStyle);
+                                              }
+                                            } else {
+                                              return Text(
+                                                  '온도(최저): _ _%, 온도(최고): _ _%',
+                                                  style: smallWhiteTextStyle);
+                                            }
+                                          }),
                                     ],
                                   ),
                                   Column(
@@ -620,9 +666,10 @@ class _EditScreenState extends State<EditScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       InkWell(
-                                        onTap: () {
-                                          print('tap2');
-                                          _displayConditionInputDialog(context);
+                                        onTap: () async {
+                                          await _displayConditionInputDialog(
+                                              context);
+                                          setState(() {});
                                         },
                                         child: Icon(
                                           Icons.chevron_right_rounded,

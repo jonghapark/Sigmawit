@@ -48,6 +48,9 @@ class _DetailScreenState extends State<DetailScreen> {
   int unConditionalCount = 0;
   double min = 100;
   double max = -100;
+  int _minTemp = 4;
+  int _maxTemp = 28;
+  bool isSwitchedHumi = true;
   DateTime minTime;
   DateTime maxTime;
   // String result = '';
@@ -112,7 +115,7 @@ class _DetailScreenState extends State<DetailScreen> {
                   .format(filteredDatas[i].timestamp.toLocal()) +
               '\n',
           //TODO: min , max 변경
-          innerCondition(4, 28, filteredDatas[i].temperature)
+          innerCondition(_minTemp, _maxTemp, filteredDatas[i].temperature)
         ], TextStyle(), filteredDatas[i].temperature),
       );
     }
@@ -534,9 +537,19 @@ class _DetailScreenState extends State<DetailScreen> {
   fetchLogData() async {
     minTime = await File(widget.currentDevice.firstPath).lastModified();
     maxTime = await File(widget.currentDevice.secondPath).lastModified();
-    print('날짜는요?');
-    print(minTime.toString());
-    print(maxTime.toString());
+
+    DeviceInfo temp =
+        await DBHelper().getDevice(widget.currentDevice.getserialNumber());
+    isSwitchedHumi = temp.isDesiredConditionOn == 'true' ? true : false;
+
+    if (isSwitchedHumi == true) {
+      _minTemp = temp.minHumidity;
+      _maxTemp = temp.maxHumidity;
+    } else {
+      _minTemp = temp.minTemper;
+      _maxTemp = temp.maxTemper;
+    }
+
     await monitorCharacteristic(widget.currentDevice.peripheral);
     print('Write Start');
     print(widget.minmaxStamp.toString());
@@ -580,8 +593,8 @@ class _DetailScreenState extends State<DetailScreen> {
           List<LogData> tmp = [];
 
           for (int i = 0; i < fetchDatas.length; i++) {
-            if (fetchDatas[i].temperature < 4 ||
-                fetchDatas[i].temperature > 28) {
+            if (fetchDatas[i].temperature < _minTemp ||
+                fetchDatas[i].temperature > _maxTemp) {
               unConditionalCount++;
             }
             tmp.add(fetchDatas[i]);
@@ -877,6 +890,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                           children: [
                                             SfCartesianChart(
                                                 primaryYAxis: NumericAxis(
+                                                    maximum: 40,
                                                     interval: 10,
                                                     minimum: 0,
                                                     plotBands: <PlotBand>[
@@ -885,7 +899,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                                             TextAnchor.end,
                                                         shouldRenderAboveSeries:
                                                             false,
-                                                        text: '4°C',
+                                                        text: '$_minTemp°C',
                                                         textStyle: TextStyle(
                                                             color: Colors.red,
                                                             fontSize: 12,
@@ -893,8 +907,8 @@ class _DetailScreenState extends State<DetailScreen> {
                                                                 FontWeight
                                                                     .bold),
                                                         isVisible: true,
-                                                        start: 4,
-                                                        end: 4,
+                                                        start: _minTemp,
+                                                        end: _minTemp,
                                                         borderWidth: 2,
                                                         // color: Colors.red,
                                                         // opacity: 0.3,
@@ -907,7 +921,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                                             TextAnchor.end,
                                                         shouldRenderAboveSeries:
                                                             false,
-                                                        text: '28°C',
+                                                        text: '$_maxTemp°C',
                                                         textStyle: TextStyle(
                                                             color: Colors.red,
                                                             fontSize: 12,
@@ -915,8 +929,8 @@ class _DetailScreenState extends State<DetailScreen> {
                                                                 FontWeight
                                                                     .bold),
                                                         isVisible: true,
-                                                        start: 28,
-                                                        end: 28,
+                                                        start: _maxTemp,
+                                                        end: _maxTemp,
                                                         borderWidth: 2,
                                                         // color: Colors.grey,
                                                         // opacity: 0.3
