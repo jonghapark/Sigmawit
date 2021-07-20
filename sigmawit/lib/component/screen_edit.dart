@@ -49,6 +49,8 @@ class _EditScreenState extends State<EditScreen> {
   int _maxHumi = 28;
   bool isSwitchedHumi = true;
   bool isSwitchedTemp = true;
+  Future<DeviceInfo> _deviceData;
+  Future<List<DeviceInfo>> _allDeviceTemp;
 
   loc.Location location = new loc.Location();
   loc.LocationData currentLocation;
@@ -63,13 +65,15 @@ class _EditScreenState extends State<EditScreen> {
     _minHumi = 4;
     _maxHumi = 28;
     selectedDevice = widget.currentDevice;
-
+    _deviceData = DBHelper().getDevice(widget.currentDevice.getserialNumber());
+    _allDeviceTemp = DBHelper().getAllDevices();
     super.initState();
     // test = _IntegerExample();
   }
 
   Future<void> _displayTextInputDialog(BuildContext context) async {
     return showDialog(
+        barrierDismissible: false,
         context: context,
         builder: (context) {
           return AlertDialog(
@@ -138,6 +142,7 @@ class _EditScreenState extends State<EditScreen> {
 
   Future<String> deleteDeviceDialog(BuildContext context) async {
     return showDialog(
+        barrierDismissible: false,
         context: context,
         builder: (context) {
           return AlertDialog(
@@ -167,11 +172,14 @@ class _EditScreenState extends State<EditScreen> {
         });
   }
 
-  Future<void> _displayConditionInputDialog(BuildContext context) async {
+  Future<List<dynamic>> _displayConditionInputDialog(
+      BuildContext context) async {
     return showDialog(
+        barrierDismissible: false,
         context: context,
-        builder: (context) {
-          return StatefulBuilder(builder: (context, setState) {
+        builder: (BuildContext context) {
+          return StatefulBuilder(
+              builder: (BuildContext context, StateSetter setState) {
             return AlertDialog(
               title: Text('적정 온도 설정'),
               content: Container(
@@ -263,25 +271,33 @@ class _EditScreenState extends State<EditScreen> {
                 ),
                 TextButton(
                   child: Text('저장'),
-                  onPressed: () {
-                    setState(() {
-                      DBHelper().updateDeviceCondition(
-                        selectedDevice.getserialNumber(),
-                        _minTemp,
-                        _maxTemp,
-                        _minHumi,
-                        _maxHumi,
-                        isSwitchedHumi == true ? 'true' : 'false',
-                      );
-                    });
-
-                    Navigator.pop(context);
+                  onPressed: () async {
+                    await DBHelper().updateDeviceCondition(
+                      selectedDevice.getserialNumber(),
+                      _minTemp,
+                      _maxTemp,
+                      _minHumi,
+                      _maxHumi,
+                      isSwitchedHumi == true ? 'true' : 'false',
+                    );
+                    // setState(() {});
+                    Navigator.pop(context, [
+                      _minTemp,
+                      _maxTemp,
+                      _minHumi,
+                      _maxHumi,
+                      isSwitchedHumi
+                    ]);
                   },
                 ),
               ],
             );
           });
-        });
+        }).then((value) {
+      if (value != null) {
+        print(value.toString());
+      }
+    });
   }
 
   // 카메라 호출 함수
@@ -528,7 +544,7 @@ class _EditScreenState extends State<EditScreen> {
                                       Text('디바이스 이름 : ',
                                           style: whiteBoldTextStyle),
                                       FutureBuilder(
-                                          future: DBHelper().getAllDevices(),
+                                          future: _allDeviceTemp,
                                           builder: (BuildContext context,
                                               AsyncSnapshot<List<DeviceInfo>>
                                                   snapshot) {
@@ -612,9 +628,7 @@ class _EditScreenState extends State<EditScreen> {
                                       Text('온도 조건 : ',
                                           style: whiteBoldTextStyle),
                                       FutureBuilder(
-                                          future: DBHelper().getDevice(widget
-                                              .currentDevice
-                                              .getserialNumber()),
+                                          future: _deviceData,
                                           builder: (BuildContext context,
                                               AsyncSnapshot<DeviceInfo>
                                                   snapshot) {
@@ -630,16 +644,26 @@ class _EditScreenState extends State<EditScreen> {
                                               String isTemp2 = snapshot
                                                   .data.isDesiredConditionOn;
                                               // setState(() {
+                                              // print(_minTemp);
+                                              // if (_minTemp != minTemp1)
                                               _minTemp = minTemp1;
+
+                                              // if (_maxTemp != maxTemp1)
                                               _maxTemp = maxTemp1;
+                                              // if (_minHumi != minTemp2)
                                               _minHumi = minTemp2;
+
+                                              // if (_maxHumi != maxTemp2)
                                               _maxHumi = maxTemp2;
+
                                               if (isTemp2 == 'false') {
                                                 // isSwitchedTemp = true;
-                                                isSwitchedHumi = false;
+                                                if (isSwitchedHumi != false)
+                                                  isSwitchedHumi = false;
                                               } else {
                                                 // isSwitchedTemp = false;
-                                                isSwitchedHumi = true;
+                                                if (isSwitchedHumi != true)
+                                                  isSwitchedHumi = true;
                                               }
                                               // });
 
@@ -667,9 +691,25 @@ class _EditScreenState extends State<EditScreen> {
                                     children: [
                                       InkWell(
                                         onTap: () async {
-                                          await _displayConditionInputDialog(
-                                              context);
-                                          setState(() {});
+                                          List<dynamic> temp =
+                                              await _displayConditionInputDialog(
+                                                  context);
+                                          if (temp != null) {
+                                            print(temp.toString());
+                                            // _minTemp = temp[0];
+                                            // _maxTemp = temp[1];
+                                            // _minHumi = temp[2];
+                                            // _maxHumi = temp[3];
+                                            // isSwitchedHumi = temp[4];
+                                            // setState(() {
+                                            //   _minTemp = temp[0];
+                                            //   _maxTemp = temp[1];
+                                            //   _minHumi = temp[2];
+                                            //   _maxHumi = temp[3];
+                                            //   isSwitchedHumi = temp[4];
+                                            // });
+                                            Navigator.pop(context);
+                                          }
                                         },
                                         child: Icon(
                                           Icons.chevron_right_rounded,
@@ -813,6 +853,7 @@ showUploadDialog(BuildContext context, int size) {
     }
   });
   return showDialog(
+    barrierDismissible: false,
     context: context,
     builder: (context) {
       return Dialog(
@@ -877,6 +918,7 @@ showMyDialog_Delete(BuildContext context) {
     }
   });
   return showDialog(
+    barrierDismissible: false,
     context: context,
     builder: (context) {
       return Dialog(

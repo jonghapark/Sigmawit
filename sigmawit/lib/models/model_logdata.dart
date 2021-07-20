@@ -53,6 +53,7 @@ class DBHelper {
   initDB() async {
     Directory documentsDirectory = await getApplicationDocumentsDirectory();
     String path = join(documentsDirectory.path, 'DeviceInfo3.db');
+    print('init');
 
     return await openDatabase(path, version: 1, onCreate: (db, version) async {
       await db.execute('''
@@ -84,13 +85,23 @@ class DBHelper {
     // print(device.macAddress);
     var res = await db.rawInsert(
         'INSERT INTO $TableName(name, mac, conditionflag, minTemp, maxTemp, minHumi , maxHumi, firstPath, secondPath) VALUES(?,?,?,?,?,?,?,?,?)',
-        [device.deviceName, device.macAddress, 'false', 0, 0, 0, 0, '', '']);
+        [
+          device.deviceName,
+          device.macAddress,
+          'false',
+          device.minTemper,
+          device.maxTemper,
+          device.minHumidity,
+          device.maxHumidity,
+          '',
+          ''
+        ]);
     return res;
   }
 
   //Create
   createSavedMac(String mac) async {
-    print(mac.toUpperCase());
+    // print(mac.toUpperCase());
     final db = await database;
     var res = await db
         .rawInsert('INSERT INTO savedList(mac) VALUES(?)', [mac.toUpperCase()]);
@@ -127,6 +138,7 @@ class DBHelper {
   //Update-imagePath
   updateImagePath(String macAddress, String path, String flag) async {
     final db = await database;
+    // print('Update Image ' + path);
     if (flag == 'first') {
       var res = await db.rawUpdate(
           'UPDATE $TableName SET firstPath = ?, secondPath = ? WHERE mac = ?',
@@ -145,6 +157,7 @@ class DBHelper {
     var res = await db.rawUpdate(
         'UPDATE $TableName SET minTemp = ?, maxTemp = ?, minHumi = ?, maxHumi = ?, conditionflag = ? WHERE mac = ?',
         [minTemp, maxTemp, minHumi, maxHumi, conditionFlag, macAddress]);
+    print('update end');
   }
 
   //reset-Device
@@ -158,6 +171,7 @@ class DBHelper {
   //Read All
   Future<List<DeviceInfo>> getAllDevices() async {
     final db = await database;
+    // print('Get all Devices Data');
     var res = await db.rawQuery('SELECT * FROM $TableName');
     List<DeviceInfo> list = res.isNotEmpty
         ? res
@@ -184,7 +198,7 @@ class DBHelper {
     print('저장 데이터 읽기 시작');
     List<String> list =
         res.isNotEmpty ? res.map((c) => c['mac'].toString()).toList() : [];
-    print(list);
+    // print(list);
     return list;
   }
 
@@ -193,7 +207,7 @@ class DBHelper {
     final db = await database;
     var res =
         db.rawDelete('DELETE FROM $TableName WHERE mac = ?', [macAddress]);
-    print('DeleteDevice');
+    // print('DeleteDevice');
     return res;
   }
 

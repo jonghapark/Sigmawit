@@ -1077,6 +1077,7 @@ showMyDialog(BuildContext context) {
     }
   });
   return showDialog(
+    barrierDismissible: false,
     context: context,
     builder: (context) {
       return Dialog(
@@ -1131,6 +1132,7 @@ showUploadDialog(BuildContext context, int size) {
     }
   });
   return showDialog(
+    barrierDismissible: false,
     context: context,
     builder: (context) {
       return Dialog(

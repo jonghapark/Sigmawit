@@ -55,12 +55,17 @@ class ScanscreenState extends State<Scanscreen> {
 
   String firstImagePath = '';
   String secondImagePath = '';
+  Future<List<DeviceInfo>> _allDeviceTemp;
+
+  // Future<List<DateTime>> allDatetime;
 
   String currentTemp;
   String currentHumi;
 
   @override
   void initState() {
+    // _allDeviceTemp = DBHelper().getAllDevices();
+
     super.initState();
     // getCurrentLocation();
     currentDeviceName = '';
@@ -206,7 +211,6 @@ class ScanscreenState extends State<Scanscreen> {
         // print('혹시 이거임 ?' + notifyResult.toString());
         if (notifyResult[10] == 0x0a) {
           // FIXME: 기존 데이터 삭제 후 ( 다이얼로그 종료 ) -> ( 운송 시작 다이얼로그 ) 변경
-
           await showMyDialog_StartTransport(context);
           Navigator.of(context).pop();
         }
@@ -409,7 +413,7 @@ class ScanscreenState extends State<Scanscreen> {
   }
 
   //장치 화면에 출력하는 위젯 함수
-  list() {
+  list2() {
     if (deviceList?.isEmpty == true) {
       return Container(
           decoration: BoxDecoration(
@@ -748,6 +752,485 @@ class ScanscreenState extends State<Scanscreen> {
                                           AsyncSnapshot<DateTime> snapshot) {
                                         if (snapshot.hasData) {
                                           DateTime mintime = snapshot.data;
+                                          return Text(DateFormat('dd일 HH:mm:ss')
+                                              .format(mintime));
+                                        } else {
+                                          return Text('--일 --:--:--');
+                                        }
+                                      }),
+                                ],
+                              ),
+                              Row(
+                                children: [
+                                  Text('종료 시간 : '),
+                                  FutureBuilder(
+                                      future: File(deviceList[index].secondPath)
+                                          .lastModified(),
+                                      builder: (BuildContext context,
+                                          AsyncSnapshot<DateTime> snapshot) {
+                                        if (snapshot.hasData) {
+                                          DateTime maxtime = snapshot.data;
+                                          return Text(DateFormat('dd일 HH:mm:ss')
+                                              .format(maxtime));
+                                        } else {
+                                          return Text('--일 --:--:--');
+                                        }
+                                      }),
+                                ],
+                              ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        getbatteryImage(
+                                            deviceList[index].getBattery()),
+                                        Text(
+                                          '  ' +
+                                              deviceList[index]
+                                                  .getBattery()
+                                                  .toString() +
+                                              '%',
+                                          style: lastUpdateTextStyle(context),
+                                        ),
+                                      ],
+                                    )
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                flex: 8,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      '최근 업데이트  ',
+                                      style: lastUpdateTextStyle(context),
+                                    ),
+                                    deviceList[index].lastUpdateTime != null
+                                        ? Text(
+                                            DateFormat('yyyy-MM-dd - HH:mm')
+                                                .format(deviceList[index]
+                                                    .lastUpdateTime),
+                                            style: updateTextStyle(context),
+                                          )
+                                        : Text(
+                                            '-',
+                                            style: updateTextStyle(context),
+                                          ),
+                                    Text('  ')
+                                  ],
+                                ),
+                              ),
+                            ],
+                          )
+                        ])),
+              )
+            ]),
+          );
+        },
+        //12,13 온도
+        separatorBuilder: (BuildContext context, int index) {
+          return Divider();
+        },
+        // itemBuilder: (context, index) {
+        //   return ListTile(
+        //       title: Text(deviceList[index].deviceName),
+        //       subtitle: Text(deviceList[index].peripheral.identifier),
+        //       trailing: Text("${deviceList[index].rssi}"),
+        //       onTap: () {
+        //         // itemCount: deviceList.length,
+        //         // itemBuilder: (context, index) () ListView.builder()
+        //         // 처음에 1.. 시작하면 2, connected 3 disconnected 4
+        //         // 리스트중 한개를 탭(터치) 하면 해당 디바이스와 연결을 시도한다.
+        //         // bool currentState = false;
+        //         // setState(() {
+        //         //   processState = 2;
+        //         // });
+        //         // connect(index);
+        //       });
+        // },
+      );
+    }
+  }
+
+  //장치 화면에 출력하는 위젯 함수
+  list() {
+    if (deviceList?.isEmpty == true) {
+      return Container(
+          decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [customeBoxShadow()],
+              borderRadius: BorderRadius.all(Radius.circular(5))),
+          height: MediaQuery.of(context).size.height * 0.33,
+          width: MediaQuery.of(context).size.width * 0.99,
+          child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Column(
+                  children: [
+                    Text(
+                      '우측 상단의 + 버튼을 이용하여 \n',
+                      style: lastUpdateTextStyle(context),
+                    ),
+                    Text(
+                      '기기를 등록해주세요 !',
+                      style: lastUpdateTextStyle(context),
+                    ),
+                  ],
+                ),
+                Column(
+                  children: [
+                    Text('또는, 블루투스가 켜져있나 확인해주세요.\n',
+                        style: lastUpdateTextStyle(context)),
+                    InkWell(
+                        onTap: () {
+                          _isScanning = false;
+                          scan();
+                        },
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.refresh,
+                              size: 40,
+                              color: Color.fromRGBO(0x61, 0xB2, 0xD0, 1),
+                            ),
+                            Text('새로고침', style: lastUpdateTextStyle(context))
+                          ],
+                        ))
+                  ],
+                )
+              ]));
+    } else {
+      return ListView.separated(
+        padding: const EdgeInsets.all(8),
+        itemCount: deviceList.length,
+        itemBuilder: (BuildContext context, int index) {
+          return Container(
+            decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [customeBoxShadow()],
+                borderRadius: BorderRadius.all(Radius.circular(5))),
+            height: MediaQuery.of(context).size.height * 0.33,
+            width: MediaQuery.of(context).size.width * 0.99,
+            child: Column(children: [
+              Expanded(
+                  flex: 4,
+                  child: InkWell(
+                    onTap: () async {
+                      await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => EditScreen(
+                                    currentDevice: deviceList[index],
+                                  ))).then((value) => {
+                            endRoutine(value, index),
+                          });
+                      // 여기 2
+                      // await startRoutine(index);
+                    },
+                    child: Container(
+                        padding: EdgeInsets.only(top: 5, left: 2),
+                        width: MediaQuery.of(context).size.width * 0.98,
+                        decoration: BoxDecoration(
+                            color: Color.fromRGBO(71, 71, 71, 1),
+                            //boxShadow: [customeBoxShadow()],
+                            borderRadius: BorderRadius.all(Radius.circular(5))),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Row(
+                              children: [
+                                Text(' '),
+                                Image(
+                                  image: AssetImage('images/T301.png'),
+                                  fit: BoxFit.contain,
+                                  width:
+                                      MediaQuery.of(context).size.width * 0.10,
+                                  height:
+                                      MediaQuery.of(context).size.width * 0.10,
+                                ),
+                                Text(' '),
+                                FutureBuilder(
+                                    future: _allDeviceTemp,
+                                    builder: (BuildContext context,
+                                        AsyncSnapshot<List<DeviceInfo>>
+                                            snapshot) {
+                                      if (snapshot.hasData) {
+                                        List<DeviceInfo> devices =
+                                            snapshot.data;
+                                        String temp = '';
+                                        for (int i = 0;
+                                            i < devices.length;
+                                            i++) {
+                                          // print(devices[i].macAddress);
+                                          // print(devices[i].macAddress);
+                                          // print(deviceList[index]
+                                          //     .getserialNumber());
+                                          if (devices[i].macAddress ==
+                                              deviceList[index]
+                                                  .getserialNumber()) {
+                                            temp = devices[i].deviceName;
+
+                                            deviceList[index].firstPath =
+                                                devices[i].firstPath;
+                                            deviceList[index].secondPath =
+                                                devices[i].secondPath;
+
+                                            break;
+                                          }
+                                        }
+                                        if (temp == '') {
+                                          return Text(
+                                            deviceList[index].getDeviceId(),
+                                            style: whiteTextStyle(context),
+                                          );
+                                        } else {
+                                          deviceList[index].deviceName = temp;
+
+                                          return Text(
+                                            temp,
+                                            style: whiteTextStyle(context),
+                                          );
+                                        }
+                                      } else {
+                                        return Text(
+                                          deviceList[index].getDeviceId(),
+                                          style: whiteTextStyle(context),
+                                        );
+                                      }
+                                    })
+                              ],
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                deviceList[index].firstPath == ''
+                                    ? new IconButton(
+                                        iconSize:
+                                            MediaQuery.of(context).size.width *
+                                                0.15,
+                                        icon: Icon(
+                                          Icons.image,
+                                          size: MediaQuery.of(context)
+                                                  .size
+                                                  .width *
+                                              0.15,
+                                        ),
+                                        onPressed: () async {
+                                          // confirmPicture(
+                                          //     context,
+                                          //     deviceList[index].firstPath,
+                                          //     'first',
+                                          //     index);
+
+                                          String pictureResult =
+                                              await takePicture(context, index);
+                                          if (pictureResult != null &&
+                                              pictureResult != '') {
+                                            deviceList[index].firstPath =
+                                                pictureResult;
+                                            String temps = await confirmPicture(
+                                                context,
+                                                deviceList[index].firstPath,
+                                                'first',
+                                                index);
+                                            print('Result :' + temps);
+                                          }
+                                        })
+                                    : InkWell(
+                                        onTap: () async {
+                                          String temps = await confirmPicture(
+                                              context,
+                                              deviceList[index].firstPath,
+                                              'first',
+                                              index);
+                                          // print('Result :' + temps);
+                                          if (temps != null && temps != '') {
+                                            deviceList[index].firstPath = temps;
+                                            setState(() {
+                                              deviceList[index].firstPath =
+                                                  temps;
+                                            });
+                                          }
+
+                                          // print(
+                                          //     this.deviceList[index].firstPath);
+                                          // print(deviceList[index].firstPath);
+                                        },
+                                        child: Image.file(
+                                          File(deviceList[index].firstPath),
+                                          width: MediaQuery.of(context)
+                                                  .size
+                                                  .width *
+                                              0.15,
+                                          height: MediaQuery.of(context)
+                                                  .size
+                                                  .width *
+                                              0.15,
+                                          fit: BoxFit.fitHeight,
+                                        ),
+                                      ),
+                                deviceList[index].secondPath == ''
+                                    ? new IconButton(
+                                        iconSize:
+                                            MediaQuery.of(context).size.width *
+                                                0.15,
+                                        icon: Icon(
+                                          Icons.image,
+                                          size: MediaQuery.of(context)
+                                                  .size
+                                                  .width *
+                                              0.15,
+                                        ),
+                                        onPressed: () async {
+                                          // confirmPicture(
+                                          //     context,
+                                          //     deviceList[index].secondPath,
+                                          //     'second',
+                                          //     index);
+
+                                          String pictureResult =
+                                              await takePicture2(
+                                                  context, index);
+                                          if (pictureResult != null &&
+                                              pictureResult != '') {
+                                            deviceList[index].secondPath =
+                                                pictureResult;
+                                            setState(() {
+                                              deviceList[index].secondPath =
+                                                  pictureResult;
+                                            });
+                                            print('before : ' +
+                                                deviceList[index].secondPath);
+                                            await confirmPicture(
+                                                context,
+                                                deviceList[index].secondPath,
+                                                'second',
+                                                index);
+
+                                            print('???' +
+                                                deviceList[index].secondPath);
+                                          }
+                                        })
+                                    : InkWell(
+                                        onTap: () async {
+                                          String temps = await confirmPicture(
+                                              context,
+                                              deviceList[index].secondPath,
+                                              'second',
+                                              index);
+                                          if (temps != null && temps != '') {
+                                            deviceList[index].secondPath =
+                                                temps;
+                                            setState(() {
+                                              deviceList[index].secondPath =
+                                                  temps;
+                                            });
+                                          }
+                                        },
+                                        child: Image.file(
+                                            File(deviceList[index].secondPath),
+                                            width: MediaQuery.of(context)
+                                                    .size
+                                                    .width *
+                                                0.15,
+                                            height: MediaQuery.of(context)
+                                                    .size
+                                                    .width *
+                                                0.15),
+                                      )
+                              ],
+                            )
+                          ],
+                        )),
+                  )),
+              Expanded(
+                flex: 3,
+                child: InkWell(
+                    onTap: () async {
+                      // await connect(index, 0);
+                      // 여기 2
+                      // await startRoutine(index);
+                    },
+
+                    // onTap: Navigator.push(
+                    //     context,
+                    //     MaterialPageRoute(
+                    //         builder: (context) => DetailScreen()(
+                    //               camera: firstCamera,
+                    //             ))),
+                    child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              SizedBox(),
+                            ],
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              Row(
+                                children: [
+                                  Image(
+                                    image:
+                                        AssetImage('images/ic_thermometer.png'),
+                                    fit: BoxFit.cover,
+                                    width: MediaQuery.of(context).size.width *
+                                        0.10,
+                                    height: MediaQuery.of(context).size.width *
+                                        0.10,
+                                  ),
+                                  Text(
+                                      deviceList[index]
+                                              .getTemperature()
+                                              .toString() +
+                                          '°C',
+                                      style: bigTextStyle(context)),
+                                ],
+                              ),
+                              Row(
+                                children: [
+                                  Image(
+                                    image: AssetImage('images/ic_humidity.png'),
+                                    fit: BoxFit.cover,
+                                    width: MediaQuery.of(context).size.width *
+                                        0.09,
+                                    height: MediaQuery.of(context).size.width *
+                                        0.09,
+                                  ),
+                                  Text(
+                                    deviceList[index].getHumidity().toString() +
+                                        '%',
+                                    style: bigTextStyle(context),
+                                  )
+                                ],
+                              ),
+                            ],
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              Row(
+                                children: [
+                                  Text('시작 시간 : '),
+                                  FutureBuilder(
+                                      future: File(deviceList[index].firstPath)
+                                          .lastModified(),
+                                      builder: (BuildContext context,
+                                          AsyncSnapshot<DateTime> snapshot) {
+                                        if (snapshot.hasData) {
+                                          DateTime mintime = snapshot.data;
+
                                           return Text(DateFormat('dd일 HH:mm:ss')
                                               .format(mintime));
                                         } else {
@@ -1331,7 +1814,6 @@ class ScanscreenState extends State<Scanscreen> {
     color: Color.fromRGBO(244, 244, 244, 1),
     fontWeight: FontWeight.w500,
   );
-
   confirmPicture(
       BuildContext context, String imagePath, String flag, int index) {
     return showDialog(
@@ -1423,10 +1905,10 @@ class ScanscreenState extends State<Scanscreen> {
                                     if (flag == 'first') {
                                       takePicture(context, index);
 
-                                      // Navigator.of(context).pop();
+                                      Navigator.of(context).pop();
                                     } else if (flag == 'second') {
                                       takePicture2(context, index);
-                                      // Navigator.of(context).pop();
+                                      Navigator.of(context).pop();
                                     }
                                   },
                                   child: Container(
@@ -1545,10 +2027,247 @@ class ScanscreenState extends State<Scanscreen> {
       },
     );
   }
+  // confirmPicture(
+  //     BuildContext context, String imagePath, String flag, int index) {
+  //   return showDialog(
+  //       barrierDismissible: false,
+  //       context: context,
+  //       builder: (context) {
+  //         return Dialog(
+  //           shape: RoundedRectangleBorder(
+  //               borderRadius: BorderRadius.circular(20.0)),
+  //           backgroundColor: Color.fromRGBO(235, 235, 235, 1),
+  //           elevation: 0,
+  //           child: Container(
+  //               width: MediaQuery.of(context).size.width * 1.0,
+  //               height: MediaQuery.of(context).size.height * 1.0,
+  //               padding: EdgeInsets.all(4.0),
+  //               child: Column(
+  //                 mainAxisAlignment: MainAxisAlignment.center,
+  //                 children: [
+  //                   Expanded(
+  //                     flex: 4,
+  //                     child: Column(
+  //                       mainAxisAlignment: MainAxisAlignment.center,
+  //                       children: [
+  //                         imagePath == ''
+  //                             ? Icon(
+  //                                 Icons.camera,
+  //                                 size:
+  //                                     MediaQuery.of(context).size.width * 0.45,
+  //                               )
+  //                             : flag == 'first'
+  //                                 ? Image.file(
+  //                                     File(deviceList[index].firstPath),
+  //                                     width: MediaQuery.of(context).size.width *
+  //                                         0.65,
+  //                                     height:
+  //                                         MediaQuery.of(context).size.height *
+  //                                             0.65,
+  //                                     fit: BoxFit.cover,
+  //                                   )
+  //                                 : Image.file(
+  //                                     File(deviceList[index].secondPath),
+  //                                     width: MediaQuery.of(context).size.width *
+  //                                         0.65,
+  //                                     height:
+  //                                         MediaQuery.of(context).size.height *
+  //                                             0.65,
+  //                                     fit: BoxFit.cover,
+  //                                   )
+  //                       ],
+  //                     ),
+  //                   ),
+  //                   Expanded(
+  //                       flex: 1,
+  //                       child: Column(
+  //                         children: [
+  //                           Row(
+  //                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+  //                             children: [
+  //                               TextButton(
+  //                                   onPressed: () {
+  //                                     Navigator.of(context).pop();
+  //                                   },
+  //                                   child: Container(
+  //                                       margin: EdgeInsets.only(
+  //                                         top: 12,
+  //                                       ),
+  //                                       // padding:
+  //                                       //     EdgeInsets.only(top: 0, left: 12),
+  //                                       height: 50,
+  //                                       width:
+  //                                           MediaQuery.of(context).size.width *
+  //                                               0.3,
+  //                                       decoration: BoxDecoration(
+  //                                           color: Color.fromRGBO(
+  //                                               0x61, 0xB2, 0xD0, 1),
+  //                                           //boxShadow: [customeBoxShadow()],
+  //                                           borderRadius: BorderRadius.all(
+  //                                               Radius.circular(5))),
+  //                                       child: Column(
+  //                                           mainAxisAlignment:
+  //                                               MainAxisAlignment.center,
+  //                                           crossAxisAlignment:
+  //                                               CrossAxisAlignment.center,
+  //                                           children: [
+  //                                             Text('취소',
+  //                                                 style: TextStyle(
+  //                                                     color: Colors.white,
+  //                                                     fontSize: 28,
+  //                                                     fontWeight:
+  //                                                         FontWeight.bold))
+  //                                           ]))),
+  //                               TextButton(
+  //                                   onPressed: () async {
+  //                                     if (flag == 'first') {
+  //                                       String temp =
+  //                                           await takePicture(context, index);
+  //                                       print(temp);
+  //                                       if (temp != '' && temp != null) {
+  //                                         deviceList[index].firstPath = temp;
+  //                                         setState(() {
+  //                                           deviceList[index].firstPath = temp;
+  //                                         });
+  //                                       }
+
+  //                                       // Navigator.of(context).pop(temp);
+  //                                     } else if (flag == 'second') {
+  //                                       String temp =
+  //                                           await takePicture2(context, index);
+  //                                       if (temp != '' && temp != null) {
+  //                                         deviceList[index].secondPath = temp;
+  //                                         setState(() {
+  //                                           deviceList[index].secondPath = temp;
+  //                                         });
+  //                                       }
+  //                                       // Navigator.of(context).pop(temp);
+  //                                     }
+  //                                   },
+  //                                   child: Container(
+  //                                       margin: EdgeInsets.only(
+  //                                         top: 12,
+  //                                       ),
+  //                                       // padding:
+  //                                       //     EdgeInsets.only(top: 0, left: 12),
+  //                                       height: 50,
+  //                                       width:
+  //                                           MediaQuery.of(context).size.width *
+  //                                               0.3,
+  //                                       decoration: BoxDecoration(
+  //                                           color: Color.fromRGBO(
+  //                                               0x61, 0xB2, 0xD0, 1),
+  //                                           //boxShadow: [customeBoxShadow()],
+  //                                           borderRadius: BorderRadius.all(
+  //                                               Radius.circular(5))),
+  //                                       child: Column(
+  //                                           mainAxisAlignment:
+  //                                               MainAxisAlignment.center,
+  //                                           crossAxisAlignment:
+  //                                               CrossAxisAlignment.center,
+  //                                           children: [
+  //                                             Text(
+  //                                               '재촬영',
+  //                                               style: TextStyle(
+  //                                                   color: Colors.white,
+  //                                                   fontSize: 28,
+  //                                                   fontWeight:
+  //                                                       FontWeight.bold),
+  //                                             )
+  //                                           ]))),
+  //                             ],
+  //                           ),
+  //                           flag == 'second'
+  //                               ? Row(
+  //                                   mainAxisAlignment: MainAxisAlignment.center,
+  //                                   children: [
+  //                                     TextButton(
+  //                                         onPressed: () async {
+  //                                           await connect(index, 0);
+  //                                         },
+  //                                         child: Container(
+  //                                             height: 50,
+  //                                             width: MediaQuery.of(context)
+  //                                                     .size
+  //                                                     .width *
+  //                                                 0.68,
+  //                                             decoration: BoxDecoration(
+  //                                                 color: Color.fromRGBO(
+  //                                                     0x61, 0xB2, 0xD0, 1),
+  //                                                 //boxShadow: [customeBoxShadow()],
+  //                                                 borderRadius:
+  //                                                     BorderRadius.all(
+  //                                                         Radius.circular(5))),
+  //                                             child: Column(
+  //                                                 mainAxisAlignment:
+  //                                                     MainAxisAlignment.center,
+  //                                                 crossAxisAlignment:
+  //                                                     CrossAxisAlignment.center,
+  //                                                 children: [
+  //                                                   Text(
+  //                                                     '운송완료',
+  //                                                     style: TextStyle(
+  //                                                         color: Colors.white,
+  //                                                         fontSize: 28,
+  //                                                         fontWeight:
+  //                                                             FontWeight.bold),
+  //                                                   )
+  //                                                 ]))),
+  //                                   ],
+  //                                 )
+  //                               : SizedBox(),
+  //                           flag == 'first'
+  //                               ? Row(
+  //                                   mainAxisAlignment: MainAxisAlignment.center,
+  //                                   children: [
+  //                                     TextButton(
+  //                                         onPressed: () async {
+  //                                           await connect(index, 1);
+  //                                           // startTransportDialog(context, index);
+  //                                         },
+  //                                         child: Container(
+  //                                             height: 50,
+  //                                             width: MediaQuery.of(context)
+  //                                                     .size
+  //                                                     .width *
+  //                                                 0.68,
+  //                                             decoration: BoxDecoration(
+  //                                                 color: Color.fromRGBO(
+  //                                                     0x61, 0xB2, 0xD0, 1),
+  //                                                 //boxShadow: [customeBoxShadow()],
+  //                                                 borderRadius:
+  //                                                     BorderRadius.all(
+  //                                                         Radius.circular(5))),
+  //                                             child: Column(
+  //                                                 mainAxisAlignment:
+  //                                                     MainAxisAlignment.center,
+  //                                                 crossAxisAlignment:
+  //                                                     CrossAxisAlignment.center,
+  //                                                 children: [
+  //                                                   Text(
+  //                                                     '운송시작',
+  //                                                     style: TextStyle(
+  //                                                         color: Colors.white,
+  //                                                         fontSize: 28,
+  //                                                         fontWeight:
+  //                                                             FontWeight.bold),
+  //                                                   )
+  //                                                 ]))),
+  //                                   ],
+  //                                 )
+  //                               : SizedBox()
+  //                         ],
+  //                       ))
+  //                 ],
+  //               )),
+  //         );
+  //       });
+  // }
 
   Future<void> addDeviceDialog(BuildContext context) async {
     String valueText = '';
     return showDialog(
+        barrierDismissible: false,
         context: context,
         builder: (context) {
           return AlertDialog(
@@ -1616,10 +2335,11 @@ class ScanscreenState extends State<Scanscreen> {
 
   Future<void> startTransportDialog(BuildContext context, int index) async {
     return showDialog(
+        barrierDismissible: false,
         context: context,
         builder: (context) {
           return AlertDialog(
-            title: Text('운송 시작'),
+            title: Text('운송시작'),
             content: Text('기존 데이터가 삭제됩니다.\n운송을 시작하시겠습니까?'),
             actions: <Widget>[
               TextButton(
@@ -1711,7 +2431,7 @@ class ScanscreenState extends State<Scanscreen> {
                       // height:
                       //     MediaQuery.of(context).size.width * 0.45,
 
-                      child: list(),
+                      child: list2(),
                     ) //리스트 출력
                     ),
               ],
@@ -1860,6 +2580,7 @@ showMyDialog_Disconnect(BuildContext context) {
     }
   });
   return showDialog(
+    barrierDismissible: false,
     context: context,
     builder: (context) {
       return Dialog(
@@ -1914,6 +2635,7 @@ showMyDialog_Error(BuildContext context) {
     }
   });
   return showDialog(
+    barrierDismissible: false,
     context: context,
     builder: (context) {
       return Dialog(
@@ -1962,6 +2684,7 @@ showMyDialog_finishAdd(BuildContext context, String deviceName) {
     }
   });
   return showDialog(
+    barrierDismissible: false,
     context: context,
     builder: (context) {
       return Dialog(
@@ -2021,6 +2744,7 @@ showMyDialog_finishStart(BuildContext context, String deviceName) {
     }
   });
   return showDialog(
+    barrierDismissible: false,
     context: context,
     builder: (context) {
       return Dialog(
@@ -2074,6 +2798,7 @@ showMyDialog_Connecting(BuildContext context) {
     }
   });
   return showDialog(
+    barrierDismissible: false,
     context: context,
     builder: (context) {
       return Dialog(
@@ -2128,6 +2853,7 @@ showMyDialog_StartTransport(BuildContext context) {
     }
   });
   return showDialog(
+    barrierDismissible: false,
     context: context,
     builder: (context) {
       return Dialog(
