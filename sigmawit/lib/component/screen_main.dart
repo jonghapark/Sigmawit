@@ -276,27 +276,52 @@ class ScanscreenState extends State<Scanscreen> {
     Uint8List macaddress = deviceList[index].getMacAddress();
     print('쓰기 시작 ');
     if (flag == 0) {
-      var writeCharacteristics = await deviceList[index]
-          .peripheral
-          .writeCharacteristic(
-              '00001000-0000-1000-8000-00805f9b34fb',
-              '00001001-0000-1000-8000-00805f9b34fb',
-              Uint8List.fromList([0x55, 0xAA, 0x01, 0x05] +
-                  deviceList[index].getMacAddress() +
-                  [0x02, 0x04] +
-                  timestamp),
-              true);
+      if (deviceList[index].peripheral.name == 'T301') {
+        var writeCharacteristics = await deviceList[index]
+            .peripheral
+            .writeCharacteristic(
+                '00001000-0000-1000-8000-00805f9b34fb',
+                '00001001-0000-1000-8000-00805f9b34fb',
+                Uint8List.fromList([0x55, 0xAA, 0x01, 0x05] +
+                    deviceList[index].getMacAddress() +
+                    [0x02, 0x04] +
+                    timestamp),
+                true);
+      } else if (deviceList[index].peripheral.name == 'T306') {
+        var writeCharacteristics = await deviceList[index]
+            .peripheral
+            .writeCharacteristic(
+                '00001000-0000-1000-8000-00805f9b34fb',
+                '00001001-0000-1000-8000-00805f9b34fb',
+                Uint8List.fromList([0x55, 0xAA, 0x01, 0x06] +
+                    deviceList[index].getMacAddress() +
+                    [0x02, 0x04] +
+                    timestamp),
+                true);
+      }
     } else if (flag == 1) {
       // 데이터 삭제 시작
-      var writeCharacteristics = await deviceList[index]
-          .peripheral
-          .writeCharacteristic(
-              '00001000-0000-1000-8000-00805f9b34fb',
-              '00001001-0000-1000-8000-00805f9b34fb',
-              Uint8List.fromList([0x55, 0xAA, 0x01, 0x05] +
-                  deviceList[index].getMacAddress() +
-                  [0x09, 0x01, 0x01]),
-              true);
+      if (deviceList[index].peripheral.name == 'T301') {
+        var writeCharacteristics = await deviceList[index]
+            .peripheral
+            .writeCharacteristic(
+                '00001000-0000-1000-8000-00805f9b34fb',
+                '00001001-0000-1000-8000-00805f9b34fb',
+                Uint8List.fromList([0x55, 0xAA, 0x01, 0x05] +
+                    deviceList[index].getMacAddress() +
+                    [0x09, 0x01, 0x01]),
+                true);
+      } else if (deviceList[index].peripheral.name == 'T306') {
+        var writeCharacteristics = await deviceList[index]
+            .peripheral
+            .writeCharacteristic(
+                '00001000-0000-1000-8000-00805f9b34fb',
+                '00001001-0000-1000-8000-00805f9b34fb',
+                Uint8List.fromList([0x55, 0xAA, 0x01, 0x06] +
+                    deviceList[index].getMacAddress() +
+                    [0x09, 0x01, 0x01]),
+                true);
+      }
     }
   }
 
@@ -1401,7 +1426,8 @@ class ScanscreenState extends State<Scanscreen> {
               // print(name);
               // if (name.substring(0, 3) == 'IOT') {
               if (name != null) {
-                if (name.substring(0, 4) == 'T301') {
+                if (name.substring(0, 4) == 'T301' ||
+                    name.substring(0, 4) == 'T306') {
                   BleDeviceItem currentItem = new BleDeviceItem(
                       name,
                       scanResult.rssi,
@@ -1527,7 +1553,8 @@ class ScanscreenState extends State<Scanscreen> {
               // if (name.substring(0, 3) == 'IOT') {
               if (name != null) {
                 if (name.substring(0, 4) == 'T301' ||
-                    name.substring(0, 4) == 'T201') {
+                    name.substring(0, 4) == 'T201' ||
+                    name.substring(0, 4) == 'T306') {
                   BleDeviceItem currentItem = new BleDeviceItem(
                       name,
                       scanResult.rssi,
@@ -2469,13 +2496,14 @@ class ScanscreenState extends State<Scanscreen> {
         width: MediaQuery.of(context).size.width * 0.05,
         height: MediaQuery.of(context).size.width * 0.05,
       );
-    } else if (battery >= 15)
+    } else {
       return Image(
         image: AssetImage('images/battery_25.png'),
         fit: BoxFit.contain,
         width: MediaQuery.of(context).size.width * 0.1,
         height: MediaQuery.of(context).size.width * 0.1,
       );
+    }
   }
 
   TextStyle whiteTextStyle(BuildContext context) {

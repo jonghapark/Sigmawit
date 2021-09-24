@@ -41,27 +41,28 @@ class BleDeviceItem {
   }
 
   getDeviceId() {
-    if (this.deviceName != 'T301') {
+    if (this.deviceName == 'T301' || this.deviceName == 'T306') {
+      String tmpString = this.getserialNumber();
+      String tmp = ByteData.sublistView(
+              this.advertisementData.manufacturerData.sublist(7, 9))
+          .getUint16(0)
+          .toString();
+      String tmp2 = ByteData.sublistView(
+              this.advertisementData.manufacturerData.sublist(9, 10))
+          .getUint8(0)
+          .toString();
+      int tmps = int.parse(tmp);
+      int tmps2 = int.parse(tmp2);
+      String result = tmps.toRadixString(16);
+      if (tmps2 < 10) {
+        result += '0' + tmps2.toRadixString(16);
+      } else {
+        result += tmps2.toRadixString(16);
+      }
+      return 'Sensor_' + tmpString;
+    } else {
       return this.deviceName;
     }
-    String tmpString = this.getserialNumber();
-    String tmp = ByteData.sublistView(
-            this.advertisementData.manufacturerData.sublist(7, 9))
-        .getUint16(0)
-        .toString();
-    String tmp2 = ByteData.sublistView(
-            this.advertisementData.manufacturerData.sublist(9, 10))
-        .getUint8(0)
-        .toString();
-    int tmps = int.parse(tmp);
-    int tmps2 = int.parse(tmp2);
-    String result = tmps.toRadixString(16);
-    if (tmps2 < 10) {
-      result += '0' + tmps2.toRadixString(16);
-    } else {
-      result += tmps2.toRadixString(16);
-    }
-    return 'Sensor_' + tmpString;
   }
 
   String getserialNumber() {

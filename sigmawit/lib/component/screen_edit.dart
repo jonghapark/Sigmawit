@@ -797,13 +797,14 @@ class _EditScreenState extends State<EditScreen> {
         width: MediaQuery.of(context).size.width * 0.08,
         height: MediaQuery.of(context).size.width * 0.08,
       );
-    } else if (battery >= 15)
+    } else {
       return Image(
         image: AssetImage('images/battery_25.png'),
         fit: BoxFit.contain,
         width: MediaQuery.of(context).size.width * 0.08,
         height: MediaQuery.of(context).size.width * 0.08,
       );
+    }
   }
 }
 

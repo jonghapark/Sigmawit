@@ -559,16 +559,27 @@ class _DetailScreenState extends State<DetailScreen> {
     // int now = DateTime.now().millisecondsSinceEpoch;
 
     // print(DateTime.now().microsecondsSinceEpoch.toString());
-
-    var writeCharacteristics = await widget.currentDevice.peripheral
-        .writeCharacteristic(
-            '00001000-0000-1000-8000-00805f9b34fb',
-            '00001001-0000-1000-8000-00805f9b34fb',
-            Uint8List.fromList([0x55, 0xAA, 0x01, 0x05] +
-                widget.currentDevice.getMacAddress() +
-                [0x04, 0x06] +
-                widget.minmaxStamp),
-            true);
+    if (widget.currentDevice.peripheral.name == 'T301') {
+      var writeCharacteristics = await widget.currentDevice.peripheral
+          .writeCharacteristic(
+              '00001000-0000-1000-8000-00805f9b34fb',
+              '00001001-0000-1000-8000-00805f9b34fb',
+              Uint8List.fromList([0x55, 0xAA, 0x01, 0x05] +
+                  widget.currentDevice.getMacAddress() +
+                  [0x04, 0x06] +
+                  widget.minmaxStamp),
+              true);
+    } else if (widget.currentDevice.peripheral.name == 'T306') {
+      var writeCharacteristics = await widget.currentDevice.peripheral
+          .writeCharacteristic(
+              '00001000-0000-1000-8000-00805f9b34fb',
+              '00001001-0000-1000-8000-00805f9b34fb',
+              Uint8List.fromList([0x55, 0xAA, 0x01, 0x06] +
+                  widget.currentDevice.getMacAddress() +
+                  [0x04, 0x06] +
+                  widget.minmaxStamp),
+              true);
+    }
   }
 
   void _startMonitoringTemperature(
@@ -628,9 +639,6 @@ class _DetailScreenState extends State<DetailScreen> {
 
   //Datalog Parsing
   LogData transformData(Uint8List notifyResult) {
-    // print('온도 : ' + getLogTemperature(notifyResult).toString());
-    // print('습도 : ' + getLogHumidity(notifyResult).toString());
-    // print('시간 : ' + getLogTime(notifyResult).toString());
     return new LogData(
         temperature: getLogTemperature(notifyResult),
         humidity: getLogHumidity(notifyResult),
